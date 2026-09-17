@@ -1,0 +1,31 @@
+# ===== 敏感配置（绝不入库）=====
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ===== 依赖目录 =====
+node_modules/
+vendor/
+__pycache__/
+*.py[cod]
+
+# ===== 构建产物 =====
+dist/
+build/
+out/
+
+# ===== 日志与临时文件 =====
+*.log
+npm-debug.log*
+yarn-error.log*
+.tmp/
+.cache/
+
+# ===== 编辑器 / 系统文件 =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
