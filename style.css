@@ -1,0 +1,472 @@
+/* ==========================================================================
+   习惯养成规划板 · 样式
+   守则：T4 相对路径 / T5 图标只用文字或 CSS / T6 只用系统字体
+   布局：整屏 grid 四段 —— 顶栏 / 习惯区 / 待办区 / 输入框，
+        两个区各占一半高度、内部自己滚，保证首屏同时看得到（AC-3）
+   ========================================================================== */
+
+:root {
+  --bg: #f7f7f5;
+  --card: #ffffff;
+  --line: #e5e4e0;
+  --line-soft: #efeeea;
+  --text: #2c2c2a;
+  --muted: #6b6a66;
+  --faint: #a8a7a2;
+  --accent: #185fa5;
+  --accent-soft: #e6f1fb;
+  --done: #3b6d11;
+  --done-soft: #eaf3de;
+  --cell-off: #e8e7e3;   /* 未完成：中性灰，不用红（设计原则 1） */
+  --cell-future: #f4f3f0;
+  --danger: #a32d2d;
+  --danger-soft: #fbeaea;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+button { font-family: inherit; font-size: inherit; cursor: pointer; }
+
+/* ---------------------------------------------------------------- 整体骨架 */
+
+.app {
+  max-width: 1080px;
+  margin: 0 auto;
+  height: 100vh;
+  padding: 14px 20px 16px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+/* ---------------------------------------------------------------- 顶部概览 */
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 4px;
+}
+
+.topbar-left { display: flex; align-items: baseline; gap: 10px; }
+
+.today-title { font-size: 20px; font-weight: 600; margin: 0; }
+
+.today-date { color: var(--muted); font-size: 13px; }
+
+.topbar-right { color: var(--muted); font-size: 13px; }
+
+.topbar-right strong { color: var(--accent); font-size: 15px; }
+
+/* ---------------------------------------------------------------- 面板通用 */
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;               /* 关键：允许内部区域滚动而不撑破整屏 */
+  overflow: hidden;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  flex: none;
+}
+
+.panel-title { font-size: 14px; font-weight: 600; margin: 0; }
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px 10px;
+}
+
+.list { list-style: none; margin: 0; padding: 0; }
+
+/* ---------------------------------------------------------------- 按钮 */
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--text);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: #134d87; }
+
+.btn-soft { background: var(--accent-soft); color: var(--accent); border-color: #cfe4f7; }
+.btn-soft:hover { background: #d9eaf9; }
+
+.btn-ghost { color: var(--accent); font-size: 13px; padding: 4px 8px; }
+.btn-ghost:hover { background: var(--accent-soft); }
+
+.btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn-danger:hover { background: #8c2626; }
+
+.btn-danger-soft { background: var(--danger-soft); color: var(--danger); border-color: #f0d3d3; }
+.btn-danger-soft:hover { background: #f6dcdc; }
+
+/* ---------------------------------------------------------------- 习惯列表 */
+
+.habit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+
+.habit-row:hover { background: #fafaf8; }
+
+.habit-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.habit-name:hover { color: var(--accent); }
+
+.habit-strength {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 最近 7 天小格子 */
+.cells7 { display: flex; gap: 3px; flex: none; }
+
+.cells7 .cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--cell-off);
+}
+
+.cells7 .cell.on { background: var(--done); }
+.cells7 .cell.future { background: var(--cell-future); }
+
+/* 完成按钮：纯 CSS 画的圆，不引图标库（T5） */
+.habit-check {
+  flex: none;
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid #c9c8c3;
+  background: #fff;
+  padding: 0;
+}
+
+.habit-check:hover { border-color: var(--accent); }
+
+.habit-row.is-done .habit-check {
+  background: var(--done);
+  border-color: var(--done);
+}
+
+.habit-row.is-done .habit-check::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 3px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.habit-row.is-done .habit-name { color: var(--muted); }
+
+/* ---------------------------------------------------------------- 待办列表 */
+
+.todo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+.todo-row:hover { background: #fafaf8; }
+
+/* 勾选框：同样是 CSS 画的 */
+.todo-check {
+  flex: none;
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid #c9c8c3;
+  background: #fff;
+  padding: 0;
+}
+
+.todo-check:hover { border-color: var(--accent); }
+
+.todo-row.is-done .todo-check { background: var(--done); border-color: var(--done); }
+
+.todo-row.is-done .todo-check::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.todo-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* 勾完保留原位、变灰（F3 明确规定：不移走） */
+.todo-row.is-done .todo-text { color: var(--faint); text-decoration: line-through; }
+
+/* ---------------------------------------------------------------- 空状态 */
+
+.empty {
+  padding: 22px 10px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-text { margin: 0 0 12px; font-size: 13px; }
+
+/* ---------------------------------------------------------------- 底部输入 */
+
+.addbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  flex: none;
+}
+
+.addbar-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  padding: 6px 6px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.addbar-input::placeholder { color: var(--faint); }
+
+/* ---------------------------------------------------------------- 弹层通用 */
+
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 30, 28, 0.34);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10;
+}
+
+.dialog {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 20px 22px 18px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16);
+}
+
+.dialog-wide { max-width: 480px; }
+.dialog-small { max-width: 340px; }
+
+.dialog-back {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.dialog-back:hover { color: var(--accent); }
+
+.dialog-title { font-size: 17px; font-weight: 600; margin: 0 0 14px; }
+
+.dialog-text { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+/* ---------------------------------------------------- 习惯详情：强度与格子 */
+
+.detail-strength { margin-bottom: 18px; }
+
+.strength-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.strength-label { font-size: 13px; color: var(--muted); }
+
+.strength-value { font-size: 20px; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.18s ease;
+}
+
+.detail-label { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+
+.grid28 {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.gcell {
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: var(--cell-off);
+  padding: 0;
+  font-size: 10px;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gcell.on { background: var(--done); }
+
+.gcell.future {
+  background: var(--cell-future);
+  cursor: default;
+}
+
+.gcell.today { border-color: var(--accent); }
+
+.gcell:not(.future):hover { border-color: var(--accent); }
+
+.legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+
+.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.dot-done { background: var(--done); }
+.dot-miss { background: var(--cell-off); }
+.dot-future { background: var(--cell-future); border: 1px solid var(--line); }
+
+/* ---------------------------------------------------------------- 表单字段 */
+
+.field { display: block; margin-bottom: 14px; }
+
+.field-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+}
+
+.field input:focus,
+.field select:focus { border-color: var(--accent); }
+
+.form-error { color: var(--danger); font-size: 13px; margin: -4px 0 0; }
+
+/* ---------------------------------------------------------------- 窄窗口 */
+
+/* AC-13：窗口缩到约 360px 时不崩、能滚动。不追求好看 */
+@media (max-width: 600px) {
+  .app {
+    height: auto;
+    min-height: 100vh;
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    padding: 12px 12px 16px;
+  }
+
+  .panel-body { overflow-y: visible; }
+
+  .habit-row { flex-wrap: wrap; gap: 8px; }
+
+  .habit-name { flex: 1 1 100%; }
+
+  .topbar { flex-direction: column; align-items: flex-start; gap: 2px; }
+}
