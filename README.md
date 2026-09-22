@@ -25,15 +25,19 @@
 
 ### 方式 B · 起一个本地服务器（地址栏是 localhost）
 
-在**项目目录**下打开 PowerShell，执行：
+⚠️ **本机的 `python` 命令用不了**（2026-09-22 实测）：PATH 里的 `python` 指向 Microsoft Store 的占位程序
+`C:\Users\LM\AppData\Local\Microsoft\WindowsApps\python.exe`，敲下去**不报错也不启动服务**，直接静默退出。
+改用 WorkBuddy 自带的 Python，在**项目目录**下打开 PowerShell 执行：
 
 ```powershell
-python -m http.server 8000
+C:\Users\LM\.workbuddy\binaries\python\versions\3.13.12\python.exe -m http.server 8000
 ```
 
+看到 `Serving HTTP on 127.0.0.1 port 8000 ...` 就是起来了 —— **这行会一直占着窗口，不会回到提示符**。
 然后浏览器打开：**http://localhost:8000**
 
 - 想结束它：回到那个窗口按 `Ctrl + C`
+- 如果提示端口被占用：先关掉旧的那个窗口，或把 `8000` 换成 `8001`
 - 页面本身不发任何外部网络请求（AC-10），所以方式 A 和方式 B 效果一样
 
 ## 数据存在哪
