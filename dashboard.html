@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>习惯看板 · 主视图</title>
+  <!-- 相对路径引用样式（T4：file:// 下不能用 / 开头） -->
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- ============ 顶栏：标题 + 状态标签 ============ -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="app-title">习惯看板</h1>
+        <span class="today-date" id="today-date">—</span>
+      </div>
+      <div class="topbar-right">
+        <span class="source-tag">数据来源：本地假数据</span>
+        <span class="state-badge" id="state-badge">加载中</span>
+      </div>
+    </header>
+
+    <!-- ============ 主视图：四种状态在这里切换 ============ -->
+    <main class="board">
+
+      <!-- ---------- 状态①：加载中（骨架屏） ---------- -->
+      <section class="state" id="state-loading">
+        <div class="skel-head"></div>
+        <div class="skel-grid">
+          <div class="skel-card"></div>
+          <div class="skel-card"></div>
+          <div class="skel-card"></div>
+          <div class="skel-card"></div>
+        </div>
+        <div class="skel-list">
+          <div class="skel-row"></div>
+          <div class="skel-row"></div>
+          <div class="skel-row"></div>
+        </div>
+      </section>
+
+      <!-- ---------- 状态②：有数据 ---------- -->
+      <section class="state" id="state-success" hidden>
+        <section class="block">
+          <div class="block-head">
+            <h2 class="block-title">今天的习惯</h2>
+            <span class="block-hint" id="habit-hint"></span>
+          </div>
+          <div class="card-grid" id="habit-grid"></div>
+        </section>
+
+        <section class="block">
+          <div class="block-head">
+            <h2 class="block-title">今天的待办</h2>
+            <span class="block-hint" id="todo-hint"></span>
+          </div>
+          <ul class="todo-list" id="todo-list"></ul>
+        </section>
+      </section>
+
+      <!-- ---------- 状态③：空 ---------- -->
+      <section class="state state-center" id="state-empty" hidden>
+        <div class="empty-mark"></div>
+        <h2 class="state-title">还什么都没有</h2>
+        <p class="state-text">看板第一次打开时就是这样。加一个习惯，它就开始记了。</p>
+        <button type="button" class="btn btn-primary" id="btn-seed">加一个示例：早睡</button>
+      </section>
+
+      <!-- ---------- 状态④：出错 ---------- -->
+      <section class="state state-center" id="state-error" hidden>
+        <div class="error-mark"></div>
+        <h2 class="state-title">没能拿到数据</h2>
+        <p class="state-text">大概是网络没通，或者服务还没起来。数据一条都没丢，重试一下就行。</p>
+        <button type="button" class="btn btn-primary" id="btn-retry">重试</button>
+      </section>
+
+    </main>
+
+    <!-- ============ 底部演示条：手动切四种状态 ============ -->
+    <footer class="devbar">
+      <span class="devbar-label">页面状态</span>
+      <div class="devbar-btns">
+        <button type="button" data-demo="loading">加载中</button>
+        <button type="button" data-demo="success">有数据</button>
+        <button type="button" data-demo="empty">空</button>
+        <button type="button" data-demo="error">出错</button>
+      </div>
+      <span class="devbar-note">演示用；接真实接口后这一条会删掉</span>
+    </footer>
+
+  </div>
+
+  <!-- 普通 script 引入（T2：不用模块写法，file:// 下模块会被跨域拦） -->
+  <script src="dashboard.js"></script>
+</body>
+</html>
