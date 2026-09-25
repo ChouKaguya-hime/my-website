@@ -73,8 +73,32 @@ function buildMock() {
   };
 }
 
-/* ==================== 二、日期工具 ==================== */
+/*
+ * 「加一个示例：早睡」按钮专用的那一条数据。
+ *
+ * 为什么单独写一份、而不是复用上面的 buildMock()：
+ * 那个按钮写的是「加一个」，那就只该多出一个 —— 4 个习惯 + 3 条待办一起倒出来，
+ * 是按钮文案和实际行为对不上（Day 10 修的就是这个）。
+ *
+ * doneDates 故意留空：刚加进来的习惯，今天还没勾、最近 7 天也没记录，
+ * 按设计原则 1，强度显示「—」而不是 0%。
+ */
+function buildSeedData() {
+  return {
+    habits: [
+      {
+        id: 'h_sleep',
+        name: '早睡',
+        freqType: 'daily',
+        freqCount: 7,
+        doneDates: []
+      }
+    ],
+    todos: []
+  };
+}
 
+/* ==================== 二、日期工具 ==================== */
 /*
  * 为什么不直接用 new Date('2026-09-23')？
  * 那样会被当成 UTC 午夜解析，东八区下算出来差一天（Day 7 踩过的坑）。
@@ -155,7 +179,7 @@ function freqText(h) {
 /* ==================== 四、数据层 ==================== */
 
 /*
- * 演示模式：只为了让人手动看到四种状态。
+ * 演示模式：只为了让人手动看到四种状态，外加空状态那个「加一个示例」按钮。
  * 接真实接口后，整个 demoMode 和下面的 if 分支都会删掉，
  * 换成一个真正的网络请求 —— 这就是今天想要的那个「可替换的一层」。
  */
@@ -179,6 +203,10 @@ function fetchBoard() {
       }
       if (demoMode === 'empty') {
         resolve({ habits: [], todos: [] });
+        return;
+      }
+      if (demoMode === 'seed') {
+        resolve(buildSeedData());
         return;
       }
       resolve(deepCopy(buildMock()));
@@ -429,9 +457,9 @@ el('todo-list').addEventListener('click', function (ev) {
   toggleTodo(row.dataset.id);
 });
 
-/* 空状态：加一条示例，看板就有内容了 */
+/* 空状态：加一条示例习惯 —— 只加「早睡」一条，待办一条都不加 */
 el('btn-seed').addEventListener('click', function () {
-  demoMode = 'success';
+  demoMode = 'seed';
   load();
 });
 
