@@ -203,7 +203,8 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
   height: 100%;
   border-radius: 3px;
   background: var(--accent);
-  transition: width 0.3s ease;
+  /* 时长和缓动都放慢一点：太快的位移看不出「变了」，等于没有反馈 */
+  transition: width 0.36s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 .cells7 { display: flex; gap: 5px; }
@@ -270,6 +271,82 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
   border-bottom: 2px solid #fff;
   transform: translate(-50%, -65%) rotate(-45deg);
 }
+
+/* ---------------------------------------------------------------- 交互反馈 */
+
+/*
+ * 点一下之后要让人「知道生效了」，靠三样东西分工：
+ *   动效 → 抓住眼睛（是哪一块动了）
+ *   数值 → 给出结果（变成多少）
+ *   文字 → 说清动作（刚刚干了什么，见 .toast）
+ * 三者都只挂在这一个交互上，不铺到全站 —— 满屏都在动，等于什么都没强调。
+ *
+ * 实现上的一个关键：这些动效挂在「刚被替换进来的那个新节点」上（.is-changed），
+ * 新节点是全新元素，动画会自动跑一次，不需要手动重启动画。
+ */
+
+/* 变过的那张卡片：外圈光环扩散一下，指出「这里刚刚变了」 */
+@keyframes flash-card {
+  0%   { box-shadow: 0 0 0 3px var(--accent-soft); }
+  100% { box-shadow: 0 0 0 9px rgba(24, 95, 165, 0); }
+}
+
+/* 勾选圈：整圈弹一下 */
+@keyframes check-pop {
+  0%   { transform: scale(0.62); }
+  62%  { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+/* 里面的对勾：从中心弹出来（只在「刚勾上」时有，取消时自然不出现） */
+@keyframes tick-in {
+  0%   { transform: translate(-50%, -65%) rotate(-45deg) scale(0); }
+  62%  { transform: translate(-50%, -65%) rotate(-45deg) scale(1.12); }
+  100% { transform: translate(-50%, -65%) rotate(-45deg) scale(1); }
+}
+
+/* 待办行：只有底色闪一下，别的都不动（行高不变 → 下面的内容不会跟着跳） */
+@keyframes flash-row {
+  0%   { background: var(--accent-soft); }
+  100% { background: rgba(230, 241, 251, 0); }
+}
+
+.habit-card.is-changed { animation: flash-card 0.6s ease-out; }
+.habit-card.is-changed .check { animation: check-pop 0.34s cubic-bezier(0.34, 1.32, 0.64, 1); }
+.habit-card.is-changed.is-done .check::after { animation: tick-in 0.26s ease-out 0.06s both; }
+
+.todo-row.is-changed { animation: flash-row 0.6s ease-out; }
+.todo-row.is-changed .todo-check { animation: check-pop 0.34s cubic-bezier(0.34, 1.32, 0.64, 1); }
+.todo-row.is-changed.is-done .todo-check::after { animation: tick-in 0.26s ease-out 0.06s both; }
+
+/* 状态提示条：把「刚刚做了什么」写成一句话，语义上零解读成本 */
+.toast {
+  position: fixed;
+  left: 50%;
+  /* 抬高到演示条上方：贴着底边会跟演示条糊成一行，看起来像它的一部分，
+     反馈就失去了「这是刚才那一下的结果」的归属感 */
+  bottom: 92px;
+  z-index: 20;
+  transform: translate(-50%, 10px);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  /* 不接收鼠标事件：不会挡住底下的控件，连续点击不受影响 */
+  pointer-events: none;
+  max-width: min(92vw, 460px);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.toast.is-show { opacity: 1; transform: translate(-50%, 0); }
+
+/* -------- 键盘走到哪儿，哪一块亮起来（只在键盘操作时出现，鼠标点不触发） -------- */
+
+.habit-card:has(:focus-visible) { border-color: #b9d3ec; }
+.todo-row:has(:focus-visible) { background: var(--accent-soft); }
 
 /* ---------------------------------------------------------------- 空 / 出错 */
 
@@ -415,7 +492,15 @@ button:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .skel-head,
   .skel-card,
-  .skel-row { animation: none; }
+  .skel-row,
+  .habit-card.is-changed,
+  .habit-card.is-changed .check,
+  .habit-card.is-changed.is-done .check::after,
+  .todo-row.is-changed,
+  .todo-row.is-changed .todo-check,
+  .todo-row.is-changed.is-done .todo-check::after { animation: none; }
   .bar-fill { transition: none; }
   .btn { transition: none; }
+  /* 动效关掉了，提示条更要留着 —— 这种情况下它是唯一说清「刚才干了什么」的东西 */
+  .toast { transition: none; }
 }

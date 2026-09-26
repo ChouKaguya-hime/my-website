@@ -90,6 +90,14 @@
       <span class="devbar-note">演示用；接真实接口后这一条会删掉</span>
     </footer>
 
+    <!-- ============ 状态提示条：每次操作后短暂出现，把「刚刚做了什么」写成一句话 ============ -->
+    <!--
+      role="status" + aria-live="polite"：内容是给读屏软件的播报源，
+      眼睛看得见的同时，屏幕阅读器也会念一遍（这是它比「动效」更明确的地方）。
+      aria-atomic="true"：整句一起播报，不要只念变化的那几个字。
+    -->
+    <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
   </div>
 
   <!-- 普通 script 引入（T2：不用模块写法，file:// 下模块会被跨域拦） -->

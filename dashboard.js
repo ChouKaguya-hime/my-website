@@ -267,104 +267,128 @@ function findHabit(id) {
   return null;
 }
 
-/** 习惯 = 卡片：一张一条，横着铺开 */
+function findTodo(id) {
+  if (!currentData) return null;
+  for (var i = 0; i < currentData.todos.length; i++) {
+    if (currentData.todos[i].id === id) return currentData.todos[i];
+  }
+  return null;
+}
+
+/**
+ * 拼出一张习惯卡片。
+ * 单独抽出来是为了能「只换这一张」—— 局部更新和整批渲染复用同一套拼装代码，
+ * 不会出现「重画时一种样子、点一下变另一种样子」的偏差（Day 11）。
+ */
+function buildHabitCard(h) {
+  var s = calcStrength(h);
+  var done = Array.isArray(h.doneDates) ? h.doneDates : [];
+  var doneToday = isDoneToday(h);
+
+  var card = document.createElement('article');
+  card.className = 'habit-card' + (doneToday ? ' is-done' : '');
+  card.dataset.id = h.id;
+  card.dataset.strength = s.text === '—' ? 'none' : 'has';
+
+  var top = document.createElement('div');
+  top.className = 'card-top';
+
+  var name = document.createElement('h3');
+  name.className = 'card-name';
+  name.textContent = h.name;
+
+  var check = document.createElement('button');
+  check.type = 'button';
+  check.className = 'check';
+  check.dataset.act = 'toggle-habit';
+  /* aria-pressed：把「这个开关是开还是关」直接告诉读屏软件，不用猜按钮上的文字 */
+  check.setAttribute('aria-pressed', doneToday ? 'true' : 'false');
+  check.setAttribute('aria-label',
+    (doneToday ? '取消完成' : '标记完成') + '：' + h.name);
+
+  top.appendChild(name);
+  top.appendChild(check);
+
+  var freq = document.createElement('p');
+  freq.className = 'card-freq';
+  freq.textContent = freqText(h);
+
+  var row = document.createElement('div');
+  row.className = 'strength-row';
+
+  var label = document.createElement('span');
+  label.className = 'strength-label';
+  label.textContent = '本周强度';
+
+  var value = document.createElement('strong');
+  value.className = 'strength-value';
+  value.textContent = s.text;
+
+  row.appendChild(label);
+  row.appendChild(value);
+
+  var bar = document.createElement('div');
+  bar.className = 'bar';
+  var fill = document.createElement('div');
+  fill.className = 'bar-fill';
+  fill.style.width = s.percent + '%';
+  bar.appendChild(fill);
+
+  var cells = document.createElement('div');
+  cells.className = 'cells7';
+  lastNDays(7).forEach(function (d) {
+    var on = done.indexOf(d) !== -1;
+    var c = document.createElement('i');
+    c.className = 'cell' + (on ? ' on' : '');
+    c.title = humanDate(d) + (on ? '：已完成' : '：没做');
+    cells.appendChild(c);
+  });
+
+  card.appendChild(top);
+  card.appendChild(freq);
+  card.appendChild(row);
+  card.appendChild(bar);
+  card.appendChild(cells);
+  return card;
+}
+
+/** 习惯 = 卡片：一张一条，横着铺开（首次渲染用；后续单条变化走 refreshHabitCard） */
 function renderHabits(habits) {
   var grid = el('habit-grid');
   grid.textContent = '';
-
   habits.forEach(function (h) {
-    var s = calcStrength(h);
-    var done = Array.isArray(h.doneDates) ? h.doneDates : [];
-
-    var card = document.createElement('article');
-    card.className = 'habit-card' + (isDoneToday(h) ? ' is-done' : '');
-    card.dataset.id = h.id;
-    card.dataset.strength = s.text === '—' ? 'none' : 'has';
-
-    var top = document.createElement('div');
-    top.className = 'card-top';
-
-    var name = document.createElement('h3');
-    name.className = 'card-name';
-    name.textContent = h.name;
-
-    var check = document.createElement('button');
-    check.type = 'button';
-    check.className = 'check';
-    check.dataset.act = 'toggle-habit';
-    check.setAttribute('aria-label',
-      (isDoneToday(h) ? '取消完成' : '标记完成') + '：' + h.name);
-
-    top.appendChild(name);
-    top.appendChild(check);
-
-    var freq = document.createElement('p');
-    freq.className = 'card-freq';
-    freq.textContent = freqText(h);
-
-    var row = document.createElement('div');
-    row.className = 'strength-row';
-
-    var label = document.createElement('span');
-    label.className = 'strength-label';
-    label.textContent = '本周强度';
-
-    var value = document.createElement('strong');
-    value.className = 'strength-value';
-    value.textContent = s.text;
-
-    row.appendChild(label);
-    row.appendChild(value);
-
-    var bar = document.createElement('div');
-    bar.className = 'bar';
-    var fill = document.createElement('div');
-    fill.className = 'bar-fill';
-    fill.style.width = s.percent + '%';
-    bar.appendChild(fill);
-
-    var cells = document.createElement('div');
-    cells.className = 'cells7';
-    lastNDays(7).forEach(function (d) {
-      var on = done.indexOf(d) !== -1;
-      var c = document.createElement('i');
-      c.className = 'cell' + (on ? ' on' : '');
-      c.title = humanDate(d) + (on ? '：已完成' : '：没做');
-      cells.appendChild(c);
-    });
-
-    card.appendChild(top);
-    card.appendChild(freq);
-    card.appendChild(row);
-    card.appendChild(bar);
-    card.appendChild(cells);
-    grid.appendChild(card);
+    grid.appendChild(buildHabitCard(h));
   });
 }
 
-/** 待办 = 列表：一条一行 */
+/** 拼出一条待办行（同样单独抽出来，给局部更新复用） */
+function buildTodoRow(t) {
+  var li = document.createElement('li');
+  li.className = 'todo-row' + (t.done ? ' is-done' : '');
+  li.dataset.id = t.id;
+
+  var check = document.createElement('button');
+  check.type = 'button';
+  check.className = 'todo-check';
+  check.dataset.act = 'toggle-todo';
+  check.setAttribute('aria-pressed', t.done ? 'true' : 'false');
+  check.setAttribute('aria-label', (t.done ? '取消完成' : '标记完成') + '：' + t.text);
+
+  var text = document.createElement('span');
+  text.className = 'todo-text';
+  text.textContent = t.text;
+
+  li.appendChild(check);
+  li.appendChild(text);
+  return li;
+}
+
+/** 待办 = 列表：一条一行（首次渲染用；后续单条变化走 refreshTodoRow） */
 function renderTodos(todos) {
   var list = el('todo-list');
   list.textContent = '';
-
   todos.forEach(function (t) {
-    var li = document.createElement('li');
-    li.className = 'todo-row' + (t.done ? ' is-done' : '');
-    li.dataset.id = t.id;
-
-    var check = document.createElement('button');
-    check.type = 'button';
-    check.className = 'todo-check';
-    check.dataset.act = 'toggle-todo';
-    check.setAttribute('aria-label', (t.done ? '取消完成' : '标记完成') + '：' + t.text);
-
-    var text = document.createElement('span');
-    text.className = 'todo-text';
-    text.textContent = t.text;
-
-    li.appendChild(check);
-    li.appendChild(text);
-    list.appendChild(li);
+    list.appendChild(buildTodoRow(t));
   });
 }
 
@@ -391,6 +415,71 @@ function renderAll() {
   renderHints();
 }
 
+/* ==================== 六之二、局部更新（Day 11） ==================== */
+
+/*
+ * 为什么不再用 renderAll() 收尾（Day 11 换掉的写法）：
+ *   ① 整页重画＝所有节点瞬间重建，中间没有任何过渡，用户看不出「哪一下生效了」；
+ *   ② 重画会把键盘焦点冲掉（焦点掉回 body），想连续勾几条就得重新按一遍 Tab；
+ *   ③ 顺手也把滚动位置、鼠标悬停状态一起抹掉。
+ * 改成「只换动过的那一个」之后，上面三件事同时不存在了，
+ * 动效也才有机会播出来 —— 因为新节点是全新元素，动画会自动跑一次。
+ */
+
+/** 只换掉一张习惯卡片，其余卡片原地不动 */
+function refreshHabitCard(id) {
+  var grid = el('habit-grid');
+  var old = grid.querySelector('.habit-card[data-id="' + id + '"]');
+  var h = findHabit(id);
+  if (!old || !h) return;
+
+  /* 换之前先记两件事：焦点在不在里面、进度条原来是多宽 */
+  var keptFocus = old.contains(document.activeElement);
+  var s = calcStrength(h);
+  var oldFill = old.querySelector('.bar-fill');
+  var oldWidth = oldFill ? oldFill.style.width : '';
+
+  var next = buildHabitCard(h);
+  next.classList.add('is-changed');
+
+  /* 进度条要从旧宽度「长」到新宽度，所以先把新卡片里的条设回旧值 */
+  var newFill = next.querySelector('.bar-fill');
+  if (newFill && oldWidth) newFill.style.width = oldWidth;
+
+  old.parentNode.replaceChild(next, old);
+
+  if (newFill && oldWidth) {
+    void newFill.offsetWidth;   /* 强制浏览器先认下起始宽度，否则两个值会被合并成一步 */
+    newFill.style.width = s.percent + '%';
+  }
+
+  /* 焦点还回同一个按钮：键盘连续操作不会断在「换卡片」这一下 */
+  if (keptFocus) {
+    var back = next.querySelector('[data-act="toggle-habit"]');
+    if (back) back.focus({ preventScroll: true });
+  }
+}
+
+/** 只换掉一条待办行 */
+function refreshTodoRow(id) {
+  var list = el('todo-list');
+  var old = list.querySelector('.todo-row[data-id="' + id + '"]');
+  var t = findTodo(id);
+  if (!old || !t) return;
+
+  var keptFocus = old.contains(document.activeElement);
+
+  var next = buildTodoRow(t);
+  next.classList.add('is-changed');
+
+  old.parentNode.replaceChild(next, old);
+
+  if (keptFocus) {
+    var back = next.querySelector('[data-act="toggle-todo"]');
+    if (back) back.focus({ preventScroll: true });
+  }
+}
+
 /* ==================== 七、加载流程 ==================== */
 
 function load() {
@@ -415,9 +504,35 @@ function load() {
 
 /* ==================== 八、交互 ==================== */
 
+/* -------- 状态提示条：三层反馈里「说清动作」的那一层 -------- */
+
+var toastTimer = null;
+
+/**
+ * 弹一条状态提示，2.6 秒后自己收起来。
+ * 连续操作时重新计时、复用同一块地方 —— 不叠成好几条，也不排队等着播。
+ */
+function showToast(msg) {
+  var t = el('toast');
+  if (!t) return;
+
+  t.textContent = msg;
+  t.classList.remove('is-show');
+  void t.offsetWidth;              /* 重启动画：连点时也能再弹一下，而不是「第二次没反应」 */
+  t.classList.add('is-show');
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () {
+    t.classList.remove('is-show');
+  }, 2600);
+}
+
+/* -------- 两个勾选动作 -------- */
+
 /*
- * 演示版：勾选只改内存里的数据，然后重画一遍，刷新页面就恢复原样。
- * 真实版本里，这里改完要写回服务器，成功了才重画 —— 就是 app.js 里的 commit()。
+ * 演示版：勾选只改内存里的数据，然后重画，刷新页面就恢复原样。
+ * 真实版本里，这里改完要写回服务器，成功了才动页面 —— 就是 app.js 里的 commit()。
+ * 但「改完给出反馈」这件事跟数据存在哪儿无关，那是今天练的部分。
  */
 function toggleHabitToday(id) {
   var h = findHabit(id);
@@ -425,20 +540,29 @@ function toggleHabitToday(id) {
   if (!Array.isArray(h.doneDates)) h.doneDates = [];
   var t = todayStr();
   var i = h.doneDates.indexOf(t);
-  if (i === -1) h.doneDates.push(t);
-  else h.doneDates.splice(i, 1);
-  renderAll();
+  var nowDone;
+
+  if (i === -1) {
+    h.doneDates.push(t);
+    nowDone = true;
+  } else {
+    h.doneDates.splice(i, 1);
+    nowDone = false;
+  }
+
+  refreshHabitCard(id);      /* 动效 + 数值：只动这一张卡片 */
+  renderHints();             /* 数值：区块标题旁的计数 */
+  showToast((nowDone ? '已标记完成 · ' : '已取消完成 · ') + h.name);   /* 文字 */
 }
 
 function toggleTodo(id) {
-  if (!currentData) return;
-  for (var i = 0; i < currentData.todos.length; i++) {
-    if (currentData.todos[i].id === id) {
-      currentData.todos[i].done = !currentData.todos[i].done;
-      break;
-    }
-  }
-  renderAll();
+  var t = findTodo(id);
+  if (!t) return;
+  t.done = !t.done;
+
+  refreshTodoRow(id);
+  renderHints();
+  showToast((t.done ? '已标记完成 · ' : '已取消完成 · ') + t.text);
 }
 
 el('habit-grid').addEventListener('click', function (ev) {
