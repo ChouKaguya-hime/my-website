@@ -67,33 +67,13 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 .app-title { font-size: 20px; font-weight: 600; margin: 0; }
 .today-date { color: var(--muted); font-size: 13px; }
 
-.source-tag {
-  color: var(--muted);
-  font-size: 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 2px 10px;
-}
+/* 顶栏右侧：说人话的数字，和今日页同一个信息 */
+.topbar-progress { color: var(--muted); font-size: 13px; }
 
-.state-badge {
-  font-size: 12px;
-  border-radius: 999px;
-  padding: 2px 10px;
-  border: 1px solid var(--line);
-  color: var(--muted);
-}
-
-.state-badge[data-state="loading"] {
-  color: var(--accent); background: var(--accent-soft); border-color: var(--accent-soft);
-}
-.state-badge[data-state="success"] {
-  color: var(--done); background: var(--done-soft); border-color: var(--done-soft);
-}
-.state-badge[data-state="empty"] {
-  color: var(--muted); background: var(--line-soft); border-color: var(--line-soft);
-}
-.state-badge[data-state="error"] {
-  color: var(--danger); background: var(--danger-soft); border-color: var(--danger-soft);
+.topbar-progress strong {
+  color: var(--accent);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------------------------------------------------------------- 主视图 */
@@ -118,6 +98,80 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 .block-title { font-size: 15px; font-weight: 600; margin: 0; }
 .block-hint { color: var(--muted); font-size: 12px; }
+
+/* 标题右侧：计数和「新建习惯」按钮并排 */
+.block-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- 筛选条（v1.2） */
+
+/*
+ * 一排三个按钮，管着下面**两个**区块（习惯 + 待办）显示哪些 ——
+ * 所以它放在两个区块之上，而不是塞进某一个区块的标题行里。
+ * 塞进去的话，看起来就只筛那一个区块，与实际行为对不上。
+ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-label { color: var(--muted); font-size: 13px; }
+
+.filter-btn {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 13px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.filter-btn:hover { background: var(--line-soft); color: var(--text); }
+
+/*
+ * 选中态：底色和文字色**一起**换（白字 + 实心蓝，对比度 6.5:1，过 AA）。
+ * 只换底色不换字色的话，在弱视或低质量屏幕上「选中」和「没选中」的差别会小到看不见 ——
+ * 那就等于按钮组的三个状态只有一个状态是可见的。
+ */
+.filter-btn.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+.filter-btn.is-on:hover { background: #134b83; border-color: #134b83; color: #fff; }
+
+/* 「筛出 N 个习惯 · M 条待办」：跟在按钮后面，小字，不抢视线 */
+.filter-state { color: var(--faint); font-size: 12px; }
+
+/*
+ * 区块里一条都没有时的那句话。
+ * 用虚线框：一眼看出「这里本来是内容区，现在没有东西」，而不是以为是排版出错。
+ */
+.block-empty {
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/*
+ * 一条都没有时把列表本身收掉：留个空框看着像「加载坏了」，
+ * 而下面那句说明才是真的在说「就是没有」。这也是 Day 10 就发现、一直挂着的老毛病。
+ */
+.todo-list.is-void { display: none; }
 
 /* ---------------------------------------------------------------- 习惯卡片 */
 
@@ -218,6 +272,28 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 .cell.on { background: var(--done); }
 
+/*
+ * 卡片脚部的「删除」：颜色很淡，只有 hover 才变红。
+ * 为什么不跟勾选圈并排放在右上角：那里是每天要点很多次的地方，
+ * 旁边贴一个「删」按钮，迟早会点错。
+ */
+.card-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.link-danger {
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  color: var(--faint);
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.link-danger:hover { color: var(--danger); background: var(--danger-soft); }
+
 /* ---------------------------------------------------------------- 待办列表 */
 
 .todo-list {
@@ -240,11 +316,43 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 .todo-row:last-child { border-bottom: none; }
 
-.todo-text { word-break: break-word; }
+.todo-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
 
 .todo-row.is-done .todo-text {
   color: var(--faint);
   text-decoration: line-through;
+}
+
+/*
+ * 行尾的删除：一个小小的 ×，平时压暗，鼠标扫过这一行才亮起来。
+ * 不隐藏（display:none）—— 藏起来的东西没人知道它存在，等于没有这个功能。
+ */
+.row-del {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.todo-row:hover .row-del,
+.row-del:focus-visible { opacity: 1; }
+
+.row-del:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+  opacity: 1;
 }
 
 .todo-check {
@@ -323,9 +431,9 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 .toast {
   position: fixed;
   left: 50%;
-  /* 抬高到演示条上方：贴着底边会跟演示条糊成一行，看起来像它的一部分，
+  /* 抬到底部输入框上方：贴着底边会跟输入框糊成一行，看起来像它的一部分，
      反馈就失去了「这是刚才那一下的结果」的归属感 */
-  bottom: 92px;
+  bottom: 84px;
   z-index: 20;
   transform: translate(-50%, 10px);
   opacity: 0;
@@ -347,6 +455,38 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 .habit-card:has(:focus-visible) { border-color: #b9d3ec; }
 .todo-row:has(:focus-visible) { background: var(--accent-soft); }
+
+/* ---------------------------------------------------------------- 底部输入框 */
+
+/*
+ * 和今日页同一个位置、同一种长相：一句话加待办。
+ * 常驻在整页最下面，而不是塞进「待办」区块里 —— 空状态下也要能记事情，
+ * 而空状态那一屏根本没有待办区块。
+ */
+.addbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  flex: none;
+}
+
+.addbar-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  padding: 6px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.addbar-input::placeholder { color: var(--faint); }
 
 /* ---------------------------------------------------------------- 空 / 出错 */
 
@@ -392,6 +532,15 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 .state-title { font-size: 17px; font-weight: 600; margin: 0; }
 .state-text { color: var(--muted); margin: 0 0 10px; max-width: 420px; }
 
+/* 空状态的两个入口：主按钮 + 退一档的示例入口 */
+.state-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
+
 .btn {
   border: 1px solid var(--line);
   background: var(--card);
@@ -410,6 +559,79 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 }
 
 .btn-primary:hover { background: #134b83; }
+
+/* 区块标题旁边的按钮：小一号，不跟标题抢视线（配色仍由 .btn-primary 给） */
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover { background: #8c2626; }
+
+/* ---------------------------------------------------------------- 弹层 */
+
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 30, 28, 0.34);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 30;              /* 要盖住 toast（它是 20） */
+}
+
+.dialog {
+  width: 100%;
+  max-width: 400px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 20px 22px 18px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16);
+}
+
+.dialog-small { max-width: 340px; }
+
+.dialog-title { font-size: 17px; font-weight: 600; margin: 0 0 14px; }
+.dialog-text { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+/* 表单字段：和今日页的新建习惯表单长得一样，因为字段本来就一样 */
+.field { display: block; margin-bottom: 14px; }
+
+.field-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+}
+
+.field input:focus,
+.field select:focus { border-color: var(--accent); }
+
+.form-error { color: var(--danger); font-size: 13px; margin: -4px 0 0; }
 
 /* ---------------------------------------------------------------- 骨架屏 */
 
@@ -442,43 +664,8 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
  */
 @media (max-width: 560px) {
   .app { padding: 16px 16px 20px; }
-  .devbar-note { margin-left: 0; width: 100%; }
+  .block-head-right { width: 100%; justify-content: space-between; }
 }
-
-/* ---------------------------------------------------------------- 演示条 */
-
-.devbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 16px;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius);
-  background: #fbfbf9;
-}
-
-.devbar-label { color: var(--muted); font-size: 12px; }
-
-.devbar-btns { display: flex; gap: 6px; }
-
-.devbar-btns button {
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--muted);
-  border-radius: 7px;
-  padding: 4px 12px;
-}
-
-.devbar-btns button:hover { background: var(--line-soft); }
-
-.devbar-btns button.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.devbar-note { margin-left: auto; color: var(--faint); font-size: 12px; }
 
 /* ---------------------------------------------------------------- 无障碍 */
 
@@ -501,6 +688,8 @@ button:focus-visible {
   .todo-row.is-changed.is-done .todo-check::after { animation: none; }
   .bar-fill { transition: none; }
   .btn { transition: none; }
+  .row-del { transition: none; }
+  .filter-btn { transition: none; }
   /* 动效关掉了，提示条更要留着 —— 这种情况下它是唯一说清「刚才干了什么」的东西 */
   .toast { transition: none; }
 }

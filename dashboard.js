@@ -1,110 +1,89 @@
 /* ==========================================================================
-   习惯看板 · 主视图逻辑（Day 8｜第 2 周）
+   习惯看板 · 主视图逻辑（Day 12｜第 2 周）
    --------------------------------------------------------------------------
-   这一版的数据是「本地假数据」（mock），页面也不发任何网络请求。
-   但结构是按「以后要接真接口」来搭的，全部改动都收在一个地方：
+   这一版把 Day 8 的「本地假数据」换成了**真实的浏览器本地存储**。
 
-        数据层 fetchBoard()  →  渲染 renderAll()  →  状态机 setState()
+   ⭐ 最关键的一件事：它和今日页（app.js）读写的是
+      **同一个存储键 + 同一套字段**（PRD 第 6.1 节）。
+      在今日页加的习惯和待办，刷新这个页面就能看到；反过来也一样。
+      两个视图，一份数据 —— 这是本次改动的全部意义。
 
-   第 3 周接真实 API 时，只需要把 fetchBoard() 里的内容换成真的请求，
-   渲染和状态机一行都不用动。
+   结构（Day 8 搭的那三层原样保留，只把最底下取数据的地方换掉了）：
+
+       存储层 loadData / saveData  →  渲染 render*()  →  状态机 setState()
 
    必须守的硬约束（TECH_DESIGN 第 6 节 T1–T8）：
      T1 不引任何外部资源      T2 不用 ES Module（不用 import / export）
      T3 不依赖构建            T4 全部用相对路径
-     T5 图标只用 CSS 画       T6 只用系统字体
-     T8 不用 fetch 读本地文件（所以假数据直接写在下面，不读 json 文件）
+     T5 图标只用 CSS / 文字   T6 只用系统字体
+     T7 每次数据改动后立刻写回存储，然后重画页面
+     T8 不用 fetch 读本地文件（读的是 localStorage，不读 json 文件）
+
+   v1.2 追加：页面顶部多了一组「全部 / 未完成 / 已完成」的筛选（PRD F5 / AC-16）。
+   它只决定「屏幕上显示哪几条」，**不动数据** —— 存储里永远还是完整的那一份，
+   所以筛着筛着去勾选、去新增，都不会把东西改丢。
    ========================================================================== */
 
-/* ==================== 一、本地假数据（mock） ==================== */
+/* ==================== 一、存储层 ==================== */
 
 /*
- * 为什么假数据不放在单独的 .json 文件里？
- * 因为 T8 禁止用 fetch 读本地文件，而且 file:// 下读文件会被浏览器跨域拦住。
- * 所以第 2 周先把数据直接写死在代码里，第 3 周由服务器提供。
- *
- * 四条习惯是故意挑的，正好覆盖三种强度情况：
- *   早睡       每天型  最近 7 天做到 3 天  → 43%
- *   喝水       每天型  最近 7 天做到 5 天  → 71%
- *   读书       每周3次 最近 7 天做到 2 次  → 67%
- *   冥想       每周2次 最近 7 天一次没做   → 「—」而不是 0%
+ * ⚠️ 这个字符串必须和 app.js 里的 STORAGE_KEY 一字不差。
+ * 两个页面各写各的键，就会变成「两套数据」——在看板加的习惯，今日页看不见。
+ * 要动它，两个文件必须一起动。
  */
-function buildMock() {
-  var t = todayStr();
-  return {
-    habits: [
-      {
-        id: 'h_sleep',
-        name: '早睡',
-        freqType: 'daily',
-        freqCount: 7,
-        doneDates: [shiftDate(t, -6), shiftDate(t, -4), t]
-      },
-      {
-        id: 'h_water',
-        name: '每天喝够 8 杯水',
-        freqType: 'daily',
-        freqCount: 7,
-        doneDates: [
-          shiftDate(t, -6), shiftDate(t, -5), shiftDate(t, -3),
-          shiftDate(t, -2), shiftDate(t, -1)
-        ]
-      },
-      {
-        id: 'h_read',
-        name: '读书 20 分钟',
-        freqType: 'weekly',
-        freqCount: 3,
-        doneDates: [shiftDate(t, -5), shiftDate(t, -1)]
-      },
-      {
-        id: 'h_meditate',
-        name: '冥想',
-        freqType: 'weekly',
-        freqCount: 2,
-        doneDates: [shiftDate(t, -20)]
-      }
-    ],
-    todos: [
-      { id: 't_1', text: '把本周的账单对一遍', done: false },
-      { id: 't_2', text: '预约周五的牙医', done: false },
-      { id: 't_3', text: '给妈妈打个电话', done: true }
-    ]
-  };
+var STORAGE_KEY = 'habit-board/v1';
+
+var state = { habits: [], todos: [] };
+
+/**
+ * 从本地存储读出数据。
+ *
+ * 三种结果要分清，不能都当成「空」：
+ *   对象  → 读到了（也可能确实还没有任何数据）
+ *   null  → **读不出来**（存储被禁用 / 内容坏了）
+ *
+ * 「读不出来」如果说成「你还没加过东西」，会让人以为记录丢了 —— 那是更坏的结果。
+ */
+function loadData() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { habits: [], todos: [] };
+
+    var obj = JSON.parse(raw);
+    if (!obj || typeof obj !== 'object') return null;
+
+    return {
+      habits: Array.isArray(obj.habits) ? obj.habits : [],
+      todos: Array.isArray(obj.todos) ? obj.todos : []
+    };
+  } catch (e) {
+    return null;                 /* 隐私模式禁止写入 / 内容坏了 */
+  }
 }
 
-/*
- * 「加一个示例：早睡」按钮专用的那一条数据。
- *
- * 为什么单独写一份、而不是复用上面的 buildMock()：
- * 那个按钮写的是「加一个」，那就只该多出一个 —— 4 个习惯 + 3 条待办一起倒出来，
- * 是按钮文案和实际行为对不上（Day 10 修的就是这个）。
- *
- * doneDates 故意留空：刚加进来的习惯，今天还没勾、最近 7 天也没记录，
- * 按设计原则 1，强度显示「—」而不是 0%。
- */
-function buildSeedData() {
-  return {
-    habits: [
-      {
-        id: 'h_sleep',
-        name: '早睡',
-        freqType: 'daily',
-        freqCount: 7,
-        doneDates: []
-      }
-    ],
-    todos: []
-  };
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch (e) {
+    /* 存不进去（容量满 / 隐私模式）。页面还能继续用，但这次改动留不住 */
+    return false;
+  }
+}
+
+function newId(prefix) {
+  return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 /* ==================== 二、日期工具 ==================== */
-/*
- * 为什么不直接用 new Date('2026-09-23')？
- * 那样会被当成 UTC 午夜解析，东八区下算出来差一天（Day 7 踩过的坑）。
- * 所以一律用手动构造的本地日期。
- */
 
+/*
+ * 这一段的算法必须和 app.js 完全一致 ——
+ * 否则同一个习惯，两个页面算出来的「本周强度」会不一样。
+ *
+ * 为什么不直接用 new Date('2026-09-23')：
+ * 那样会被当成 UTC 午夜解析，东八区下算出来差一天（Day 7 踩过的坑）。
+ */
 var WEEK_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 function fmtDate(d) {
@@ -129,6 +108,7 @@ function shiftDate(s, n) {
   return fmtDate(d);
 }
 
+/** 最近 n 天（含今天），从最早排到今天 */
 function lastNDays(n) {
   var out = [];
   for (var i = n - 1; i >= 0; i--) {
@@ -142,13 +122,14 @@ function humanDate(s) {
   return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + WEEK_CN[d.getDay()];
 }
 
-/* ==================== 三、本周强度 ==================== */
+/* ==================== 三、本周强度（PRD 6.2） ==================== */
 
 /*
- * 本周强度 = 最近 7 天内完成的天数 ÷ 应该完成的天数
- *   · 每天型：分母 7   · 每周 N 次型：分母 N，超过 100% 也按 100%
- *   · 最近 7 天一次都没完成 → 显示「—」而不是 0%（设计原则 1）
- * 这一段跟 app.js 是同一套算法，两个页面算出来的数必须一样。
+ * 本周强度 = 最近 7 天内「完成的天数」÷「应该完成的天数」× 100%
+ *   · 每天型（daily）：分母 = 7
+ *   · 每周 N 次型（weekly）：分母 = N，算出来超过 100% 也按 100%
+ *   · 最近 7 天一次都没完成 → 显示「—」而不是 0%
+ *     「—」的意思是「还没开始」，不是「没做到」——设计原则 1 的直接落点
  */
 function calcStrength(habit) {
   var done = Array.isArray(habit.doneDates) ? habit.doneDates : [];
@@ -176,108 +157,156 @@ function freqText(h) {
   return '每天';
 }
 
-/* ==================== 四、数据层 ==================== */
+/*
+ * 看板上的待办只显示**属于今天**的，和今日页口径一致（PRD 6.1 的 date 字段就是干这个的）。
+ * 两个页面对「今天的待办」给出不同的答案，比少一个功能更糟。
+ */
+function todosToday() {
+  var t = todayStr();
+  return state.todos.filter(function (x) { return x.date === t; });
+}
+
+/** 一条数据都没有 —— 这时才配显示整页空状态 */
+function isBlank() {
+  return state.habits.length === 0 && state.todos.length === 0;
+}
+
+/* ==================== 三·五、完成状态筛选（v1.2 / AC-16） ==================== */
 
 /*
- * 演示模式：只为了让人手动看到四种状态，外加空状态那个「加一个示例」按钮。
- * 接真实接口后，整个 demoMode 和下面的 if 分支都会删掉，
- * 换成一个真正的网络请求 —— 这就是今天想要的那个「可替换的一层」。
+ * 只有一种口径：全部 / 未完成 / 已完成。
+ * 习惯卡片和待办列表**共用这一个值**，所以点一下两个区块同时收敛 ——
+ * 一页里放两个各自为政的筛选器，用户就得多记一次「我现在到底在看什么」
+ * （PRD F5 的不做清单里把这条划死了）。
+ *
+ * 这个值**不落盘**：筛选是「我现在想看什么」，不是「这个页面的设置」。
+ * 下次打开回到「全部」，才守得住设计原则 3「默认零配置、打开即全貌」。
  */
-var demoMode = 'success';
+var FILTERS = ['all', 'open', 'done'];
+var filter = 'all';
+
+/** 只判断「完成没完成」，不碰历史、不碰强度 —— 筛选不改任何数据 */
+function matchesFilter(done) {
+  if (filter === 'open') return !done;
+  if (filter === 'done') return done;
+  return true;
+}
+
+function habitVisible(h) { return matchesFilter(isDoneToday(h)); }
+function todoVisible(t) { return matchesFilter(!!t.done); }
+
+function visibleHabits() { return state.habits.filter(habitVisible); }
+function visibleTodos() { return todosToday().filter(todoVisible); }
 
 /**
- * 取看板数据。真实项目里这里是「问服务器要数据」，现在先返回本地假数据。
- * 返回 Promise 是为了跟真实网络请求的节奏一样：要等，也可能出错。
+ * 筛完一条都不剩时说什么。**两种情况必须分开说**，别混成一句：
+ *   · 本来就没有 → 告诉人下一步怎么加（新人对着一片空白是不知道该干嘛的）
+ *   · 有、但都被筛掉了 → 说明这是「筛出来的空」，不是数据没了
+ *
+ * 「没有未完成的了 —— 今天的都做完了」是**往前看**的说法：
+ * 不说「你都还没做」这种追责口气，守设计原则 1（不做惩罚性反馈）。
  */
-function fetchBoard() {
-  return new Promise(function (resolve, reject) {
+function emptyNote(kind) {
+  var noun = kind === 'habit' ? '习惯' : '待办';
+  var total = kind === 'habit' ? state.habits.length : todosToday().length;
 
-    /* 演示：假装请求还没回来 —— 骨架屏就一直挂着 */
-    if (demoMode === 'loading') return;
-
-    /* 演示：用 700 毫秒模拟网络延迟，好让人看清「加载中」那一下 */
-    setTimeout(function () {
-      if (demoMode === 'error') {
-        reject(new Error('模拟：取数据出错'));
-        return;
-      }
-      if (demoMode === 'empty') {
-        resolve({ habits: [], todos: [] });
-        return;
-      }
-      if (demoMode === 'seed') {
-        resolve(buildSeedData());
-        return;
-      }
-      resolve(deepCopy(buildMock()));
-    }, 700);
-  });
+  if (total === 0) {
+    return kind === 'habit'
+      ? '还没有习惯。点右上角的「＋ 新建习惯」加一个。'
+      : '今天还没有待办。在最下面的输入框里记一条，按回车就加上。';
+  }
+  if (filter === 'open') return '没有未完成的' + noun + '了 —— 今天的都做完了。';
+  if (filter === 'done') return '今天还没有已完成的' + noun + '。';
+  return '';
 }
 
-function deepCopy(o) {
-  return JSON.parse(JSON.stringify(o));
+/**
+ * 区块的「空」和「有」两种样子同步一次。
+ *
+ * 空的时候顺手把列表的边框收掉（.is-void）：一条都没有还留着一个空框，
+ * 看起来像「加载坏了」而不像「就是没有」—— 这是 Day 10 就发现、一直留着的老毛病，
+ * 筛选的「无结果」情况正好要正面处理它，顺手一起修了。
+ */
+function syncBlockEmpty(kind, visibleCount) {
+  var note = el(kind + '-empty');
+  var box = el(kind === 'habit' ? 'habit-grid' : 'todo-list');
+  if (!note) return;
+
+  if (visibleCount > 0) {
+    note.hidden = true;
+    note.textContent = '';
+    if (box) box.classList.remove('is-void');
+    return;
+  }
+  note.textContent = emptyNote(kind);
+  note.hidden = false;
+  if (box) box.classList.add('is-void');
 }
 
-/* ==================== 五、状态机 ==================== */
-
-/*
- * 一个页面就这四种状态，任何时刻只显示其中一种。
- * 之前只写了「有数据」那一种，另外三种是补上的。
- */
-var STATES = ['loading', 'success', 'empty', 'error'];
-
-var STATE_TEXT = {
-  loading: '加载中',
-  success: '已加载',
-  empty: '暂无内容',
-  error: '加载出错'
-};
-
-var currentState = 'loading';
-var currentData = null;
-
-function setState(name) {
-  currentState = name;
-
-  STATES.forEach(function (s) {
-    el('state-' + s).hidden = (s !== name);
-  });
-
-  var badge = el('state-badge');
-  badge.textContent = STATE_TEXT[name];
-  badge.dataset.state = name;
-
-  var btns = document.querySelectorAll('[data-demo]');
+/** 把「哪个按钮被选中」同步给眼睛（class）和读屏软件（aria-pressed） */
+function syncFilterButtons() {
+  var btns = el('filter-bar').querySelectorAll('.filter-btn');
   for (var i = 0; i < btns.length; i++) {
-    btns[i].classList.toggle('is-active', btns[i].dataset.demo === name);
+    var on = btns[i].dataset.filter === filter;
+    btns[i].classList.toggle('is-on', on);
+    btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
   }
 }
 
-/* ==================== 六、渲染 ==================== */
+/**
+ * 切换筛选口径。只重画列表和计数，**不碰数据、不碰存储**。
+ * 点「全部」就是这个函数的 name = 'all' —— 所谓「清空筛选」，就是回到这一步（AC-16 第 3 种情况）。
+ */
+function setFilter(name) {
+  filter = FILTERS.indexOf(name) === -1 ? 'all' : name;
+  syncFilterButtons();
+  renderHabits();
+  renderTodos();
+  renderHints();
+}
+
+/* ==================== 四、状态机 ==================== */
+
+/*
+ * 页面有这几种状态，任何时刻只显示其中一种。
+ *
+ * 关于 loading（骨架屏）：本地存储是同步读的，所以它在真实数据下几乎不会被看到。
+ * 保留它是因为第 3 周接上真实接口后，读数据会变成真的「要等」，那时它就是活的。
+ * error 则是有真实触发条件的：浏览器禁用了本地存储，或者存的内容已经不是合法 JSON。
+ */
+var STATES = ['loading', 'success', 'empty', 'error'];
+var currentState = 'loading';
+
+function setState(name) {
+  currentState = name;
+  STATES.forEach(function (s) {
+    el('state-' + s).hidden = (s !== name);
+  });
+}
+
+/* ==================== 五、渲染 ==================== */
 
 function el(id) {
   return document.getElementById(id);
 }
 
 function findHabit(id) {
-  if (!currentData) return null;
-  for (var i = 0; i < currentData.habits.length; i++) {
-    if (currentData.habits[i].id === id) return currentData.habits[i];
+  for (var i = 0; i < state.habits.length; i++) {
+    if (state.habits[i].id === id) return state.habits[i];
   }
   return null;
 }
 
 function findTodo(id) {
-  if (!currentData) return null;
-  for (var i = 0; i < currentData.todos.length; i++) {
-    if (currentData.todos[i].id === id) return currentData.todos[i];
+  for (var i = 0; i < state.todos.length; i++) {
+    if (state.todos[i].id === id) return state.todos[i];
   }
   return null;
 }
 
 /**
  * 拼出一张习惯卡片。
- * 单独抽出来是为了能「只换这一张」—— 局部更新和整批渲染复用同一套拼装代码，
+ * 单独抽出来是为了能「只换这一张」——局部更新和整批渲染复用同一套拼装代码，
  * 不会出现「重画时一种样子、点一下变另一种样子」的偏差（Day 11）。
  */
 function buildHabitCard(h) {
@@ -344,21 +373,30 @@ function buildHabitCard(h) {
     cells.appendChild(c);
   });
 
+  /*
+   * 删除放在卡片最下面、颜色压得很淡。
+   * 为什么不跟勾选圈并排放在右上角：那里是每天要点很多次的地方，
+   * 紧挨着放一个「删」按钮，迟早会点错。
+   */
+  var foot = document.createElement('div');
+  foot.className = 'card-foot';
+
+  var del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'link-danger';
+  del.dataset.act = 'del-habit';
+  del.textContent = '删除';
+  del.setAttribute('aria-label', '删除习惯：' + h.name);
+
+  foot.appendChild(del);
+
   card.appendChild(top);
   card.appendChild(freq);
   card.appendChild(row);
   card.appendChild(bar);
   card.appendChild(cells);
+  card.appendChild(foot);
   return card;
-}
-
-/** 习惯 = 卡片：一张一条，横着铺开（首次渲染用；后续单条变化走 refreshHabitCard） */
-function renderHabits(habits) {
-  var grid = el('habit-grid');
-  grid.textContent = '';
-  habits.forEach(function (h) {
-    grid.appendChild(buildHabitCard(h));
-  });
 }
 
 /** 拼出一条待办行（同样单独抽出来，给局部更新复用） */
@@ -378,44 +416,81 @@ function buildTodoRow(t) {
   text.className = 'todo-text';
   text.textContent = t.text;
 
+  var del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'row-del';
+  del.dataset.act = 'del-todo';
+  del.textContent = '×';
+  del.setAttribute('aria-label', '删除待办：' + t.text);
+
   li.appendChild(check);
   li.appendChild(text);
+  li.appendChild(del);
   return li;
 }
 
-/** 待办 = 列表：一条一行（首次渲染用；后续单条变化走 refreshTodoRow） */
-function renderTodos(todos) {
-  var list = el('todo-list');
-  list.textContent = '';
-  todos.forEach(function (t) {
-    list.appendChild(buildTodoRow(t));
+function renderHabits() {
+  var grid = el('habit-grid');
+  grid.textContent = '';
+  var list = visibleHabits();
+  list.forEach(function (h) {
+    grid.appendChild(buildHabitCard(h));
   });
+  syncBlockEmpty('habit', list.length);
 }
 
+function renderTodos() {
+  var list = el('todo-list');
+  list.textContent = '';
+  var rows = visibleTodos();
+  rows.forEach(function (t) {
+    list.appendChild(buildTodoRow(t));
+  });
+  syncBlockEmpty('todo', rows.length);
+}
+
+/**
+ * 两个区块的计数 + 顶部那行总进度（口径与今日页一致：习惯 + 今天的待办）。
+ *
+ * ⚠️ 这几个数字**永远按全量算，不受筛选影响** ——
+ * 「今天已完成 2 / 4」说的是今天整体的进度，不是「我现在筛出来的那几条」。
+ * 筛选只决定「列出哪些」，不决定「一共几件、做了几件」。
+ * 筛出来的条数单独写在 #filter-state 里，两个口径各说各的，不混在一起。
+ */
 function renderHints() {
-  var habits = currentData.habits;
+  var habits = state.habits;
+  var todos = todosToday();
+
   var doneH = 0;
   for (var i = 0; i < habits.length; i++) {
     if (isDoneToday(habits[i])) doneH++;
   }
   el('habit-hint').textContent = habits.length + ' 个 · 今天已完成 ' + doneH + ' 个';
 
-  var todos = currentData.todos;
   var doneT = 0;
   for (var j = 0; j < todos.length; j++) {
     if (todos[j].done) doneT++;
   }
   el('todo-hint').textContent = todos.length + ' 条 · 已完成 ' + doneT + ' 条';
+
+  el('today-count').textContent = (doneH + doneT) + ' / ' + (habits.length + todos.length);
+
+  /* 筛选结果的数量。选「全部」时不显示 —— 那时它和上面的计数说的是同一件事 */
+  var fs = el('filter-state');
+  if (fs) {
+    fs.textContent = filter === 'all'
+      ? ''
+      : '筛出 ' + visibleHabits().length + ' 个习惯 · ' + visibleTodos().length + ' 条待办';
+  }
 }
 
 function renderAll() {
-  if (!currentData) return;
-  renderHabits(currentData.habits);
-  renderTodos(currentData.todos);
+  renderHabits();
+  renderTodos();
   renderHints();
 }
 
-/* ==================== 六之二、局部更新（Day 11） ==================== */
+/* ==================== 六、局部更新（Day 11） ==================== */
 
 /*
  * 为什么不再用 renderAll() 收尾（Day 11 换掉的写法）：
@@ -480,31 +555,224 @@ function refreshTodoRow(id) {
   }
 }
 
-/* ==================== 七、加载流程 ==================== */
+/* ---------------------------------------------------------------- 增删的局部更新 */
+/*
+ * 新增 / 删除也走局部，而不是整页重画：这样新来的那一个能自己播一次入场动效，
+ * 其余卡片纹丝不动，眼睛能直接跟到「刚加的是哪个」。
+ */
 
-function load() {
-  setState('loading');
-
-  fetchBoard().then(function (data) {
-    /* 拿到了，但一条都没有 → 这才是「空状态」，不是「出错」 */
-    if (!data.habits.length && !data.todos.length) {
-      currentData = data;
-      setState('empty');
-      return;
-    }
-    currentData = data;
-    renderAll();
-    setState('success');
-  }, function () {
-    /* 没拿到 → 出错状态。数据一条都没丢，给个「重试」就行 */
-    currentData = null;
-    setState('error');
-  });
+function dropHabitNode(id) {
+  var grid = el('habit-grid');
+  var card = grid.querySelector('.habit-card[data-id="' + id + '"]');
+  if (card) grid.removeChild(card);
 }
 
-/* ==================== 八、交互 ==================== */
+function dropTodoNode(id) {
+  var list = el('todo-list');
+  var row = list.querySelector('.todo-row[data-id="' + id + '"]');
+  if (row) list.removeChild(row);
+}
 
-/* -------- 状态提示条：三层反馈里「说清动作」的那一层 -------- */
+/* ---------------------------------------------------------------- 勾选之后：这一条还该不该留在屏幕上 */
+
+/*
+ * 不处理这件事会出一个很刺眼的不一致：
+ * 正筛着「未完成」，点一下把它做完了 —— 它明明已经不匹配当前筛选条件，
+ * 却还赖在列表里。用户不会觉得「这是筛选的脾气」，只会觉得「筛选坏了」（确实坏了）。
+ *
+ * 所以勾完之后**按新的完成状态重新判一次**：
+ *   还匹配 → 走 Day 11 那套局部替换（动效、焦点都保住）
+ *   不匹配 → 摘掉节点，并补上区块的说明文字（可能是「今天的都做完了」）
+ */
+function syncHabitAfterToggle(id) {
+  var h = findHabit(id);
+  if (!h) return;
+  if (habitVisible(h)) {
+    refreshHabitCard(id);
+  } else {
+    dropHabitNode(id);
+    syncBlockEmpty('habit', visibleHabits().length);
+  }
+}
+
+function syncTodoAfterToggle(id) {
+  var t = findTodo(id);
+  if (!t) return;
+  if (todoVisible(t)) {
+    refreshTodoRow(id);
+  } else {
+    dropTodoNode(id);
+    syncBlockEmpty('todo', visibleTodos().length);
+  }
+}
+
+/* ==================== 七、加载 ==================== */
+
+function load() {
+  var data = loadData();
+
+  /* 读不出来 → 出错状态。数据一条都没被动过，给个「重试」就行 */
+  if (data === null) {
+    setState('error');
+    return;
+  }
+
+  state = data;
+
+  /*
+   * 每次进来（含点「重试」）都把筛选复位成「全部」。
+   * 因为 filter 从来不落盘 —— 它是「我现在想看什么」，不是这个页面的设置项。
+   */
+  filter = 'all';
+  syncFilterButtons();
+
+  if (isBlank()) {
+    setState('empty');
+    return;
+  }
+
+  renderAll();
+  setState('success');
+}
+
+/* ==================== 八、写操作 ==================== */
+
+/** 新建一条习惯（字段严格按 PRD 6.1，不增不减） */
+function createHabit(name, freqType, freqCount) {
+  var h = {
+    id: newId('h'),
+    name: name,
+    freqType: freqType === 'weekly' ? 'weekly' : 'daily',
+    freqCount: freqType === 'weekly' ? freqCount : 7,
+    createdAt: todayStr(),
+    doneDates: []
+  };
+  state.habits.push(h);
+  return h;
+}
+
+/**
+ * 新建习惯之后的收尾（落盘 + 渲染 + 提示）。
+ *
+ * 两种情况分开处理：
+ *   · 本来在空状态 → 整页切过去（那时页面上还没有卡片网格可插）
+ *   · 本来就有数据 → 只把新卡片追到末尾，别的卡片不动，新卡片自己播一次入场动效
+ *
+ * 落盘失败时不装作成功 —— 存不进去的改动，说了「已加上」反而是骗人的。
+ */
+function addHabit(name, freqType, freqCount) {
+  var h = createHabit(name, freqType, freqCount);
+  var ok = saveData();
+  var switched = false;
+
+  if (currentState === 'empty') {
+    renderAll();
+    setState('success');
+  } else if (!habitVisible(h)) {
+    /*
+     * 当前筛选看不见这条（比如正筛着「已完成」，却新建了一个还没做的习惯）。
+     * 这时**自动切回「全部」**，而不是悄悄加上却不显示 ——
+     * 「点了保存，页面上什么都没有」会让人以为没存上，比让人多看一眼糟得多。
+     */
+    setFilter('all');
+    switched = true;
+  } else {
+    var grid = el('habit-grid');
+    var card = buildHabitCard(h);
+    card.classList.add('is-changed');
+    grid.appendChild(card);
+    syncBlockEmpty('habit', visibleHabits().length);
+    renderHints();
+  }
+
+  showToast(ok
+    ? '已加上 · ' + h.name + (switched ? '（筛选已切回「全部」）' : '')
+    : '没能存住：这次改动关掉浏览器就没了');
+  return ok;
+}
+
+/** 勾 / 取消勾「今天」（T7：先落盘，再只换动过的那一张） */
+function toggleHabitToday(id) {
+  var h = findHabit(id);
+  if (!h) return;
+  if (!Array.isArray(h.doneDates)) h.doneDates = [];
+  var t = todayStr();
+  var i = h.doneDates.indexOf(t);
+  var nowDone;
+
+  if (i === -1) {
+    h.doneDates.push(t);
+    nowDone = true;
+  } else {
+    h.doneDates.splice(i, 1);
+    nowDone = false;
+  }
+
+  var ok = saveData();
+  syncHabitAfterToggle(id);
+  renderHints();
+  showToast(ok
+    ? (nowDone ? '已标记完成 · ' : '已取消完成 · ') + h.name
+    : '没能存住：这次改动关掉浏览器就没了');
+}
+
+function toggleTodo(id) {
+  var t = findTodo(id);
+  if (!t) return;
+  t.done = !t.done;
+
+  var ok = saveData();
+  syncTodoAfterToggle(id);
+  renderHints();
+  showToast(ok
+    ? (t.done ? '已标记完成 · ' : '已取消完成 · ') + t.text
+    : '没能存住：这次改动关掉浏览器就没了');
+}
+
+/**
+ * 一句话加待办（F3）：新的一条放最上面。
+ * date = 今天，所以它出现在「今天的待办」里 —— 和今日页加的完全一样。
+ */
+function addTodo(text) {
+  var v = String(text || '').trim();
+  if (!v) return false;              /* 空的不允许提交（AC-7） */
+
+  var t = {
+    id: newId('t'),
+    text: v,
+    date: todayStr(),
+    done: false
+  };
+
+  state.todos.unshift(t);
+
+  var ok = saveData();
+  var switched = false;
+
+  if (currentState === 'empty') {
+    renderAll();
+    setState('success');
+  } else if (!todoVisible(t)) {
+    /* 同上：正筛着「已完成」时新加一条还没做的，看不见它 —— 切回「全部」让人看见 */
+    setFilter('all');
+    switched = true;
+  } else {
+    /* 插到最前面 —— 和上面 unshift 的顺序对上，否则页面顺序会和数据顺序打架 */
+    var list = el('todo-list');
+    var row = buildTodoRow(t);
+    row.classList.add('is-changed');
+    list.insertBefore(row, list.firstChild);
+    syncBlockEmpty('todo', visibleTodos().length);
+    renderHints();
+  }
+
+  showToast(ok
+    ? '已加上 · ' + t.text + (switched ? '（筛选已切回「全部」）' : '')
+    : '没能存住：这次改动关掉浏览器就没了');
+  return ok;
+}
+
+/* ==================== 九、状态提示条 ==================== */
 
 var toastTimer = null;
 
@@ -527,82 +795,216 @@ function showToast(msg) {
   }, 2600);
 }
 
-/* -------- 两个勾选动作 -------- */
+/* ==================== 十、新建习惯弹层 ==================== */
 
-/*
- * 演示版：勾选只改内存里的数据，然后重画，刷新页面就恢复原样。
- * 真实版本里，这里改完要写回服务器，成功了才动页面 —— 就是 app.js 里的 commit()。
- * 但「改完给出反馈」这件事跟数据存在哪儿无关，那是今天练的部分。
- */
-function toggleHabitToday(id) {
-  var h = findHabit(id);
-  if (!h) return;
-  if (!Array.isArray(h.doneDates)) h.doneDates = [];
-  var t = todayStr();
-  var i = h.doneDates.indexOf(t);
-  var nowDone;
+function syncFreqField() {
+  el('freq-count-field').hidden = el('habit-freq').value !== 'weekly';
+}
 
-  if (i === -1) {
-    h.doneDates.push(t);
-    nowDone = true;
-  } else {
-    h.doneDates.splice(i, 1);
-    nowDone = false;
+function openHabitForm() {
+  el('habit-name').value = '';
+  el('habit-freq').value = 'daily';
+  el('habit-freq-count').value = 3;
+  el('habit-form-error').hidden = true;
+
+  syncFreqField();
+  el('habit-mask').hidden = false;
+  el('habit-name').focus();
+}
+
+function closeHabitForm() {
+  el('habit-mask').hidden = true;
+}
+
+/** 只填名称就能存（AC-8：频率有默认值，不改也能存） */
+function saveHabitForm() {
+  var name = el('habit-name').value.trim();
+  if (!name) {
+    var box = el('habit-form-error');
+    box.textContent = '名称得填一下，频率不改也行。';
+    box.hidden = false;
+    el('habit-name').focus();
+    return;
   }
 
-  refreshHabitCard(id);      /* 动效 + 数值：只动这一张卡片 */
-  renderHints();             /* 数值：区块标题旁的计数 */
-  showToast((nowDone ? '已标记完成 · ' : '已取消完成 · ') + h.name);   /* 文字 */
+  var freqType = el('habit-freq').value === 'weekly' ? 'weekly' : 'daily';
+  var freqCount = 7;
+  if (freqType === 'weekly') {
+    freqCount = Number(el('habit-freq-count').value) || 3;
+    if (freqCount < 1) freqCount = 1;
+    if (freqCount > 7) freqCount = 7;
+  }
+
+  closeHabitForm();
+  addHabit(name, freqType, freqCount);
 }
 
-function toggleTodo(id) {
-  var t = findTodo(id);
-  if (!t) return;
-  t.done = !t.done;
+/* ==================== 十一、删除二次确认（AC-12 / AC-15） ==================== */
 
-  refreshTodoRow(id);
-  renderHints();
-  showToast((t.done ? '已标记完成 · ' : '已取消完成 · ') + t.text);
+/*
+ * 习惯和待办共用同一个确认弹层，只有文案不同。
+ * 共用的好处：确认这一步的交互只有一种，用户不用学两遍。
+ */
+var pendingDelete = null;
+
+function askDelete(type, id) {
+  var title = el('confirm-title');
+  var text = el('confirm-text');
+
+  if (type === 'habit') {
+    var h = findHabit(id);
+    if (!h) return;
+    title.textContent = '删除这个习惯？';
+    text.textContent = '「' + h.name + '」和它的完成记录会一起没了，找不回来。';
+  } else {
+    var t = findTodo(id);
+    if (!t) return;
+    title.textContent = '删除这条待办？';
+    text.textContent = '「' + t.text + '」删掉之后找不回来。';
+  }
+
+  pendingDelete = { type: type, id: id };
+  el('confirm-mask').hidden = false;
+
+  /* 焦点给「取消」而不是「删除」：这一步的目的就是防误删，别让回车直接删掉 */
+  el('confirm-cancel').focus();
 }
 
+function closeConfirm() {
+  el('confirm-mask').hidden = true;
+  pendingDelete = null;
+}
+
+function runDelete() {
+  if (!pendingDelete) return;
+
+  var p = pendingDelete;
+  closeConfirm();
+
+  var label = '';
+
+  if (p.type === 'habit') {
+    var h = findHabit(p.id);
+    if (!h) return;
+    label = h.name;
+    state.habits = state.habits.filter(function (x) { return x.id !== p.id; });
+  } else {
+    var t = findTodo(p.id);
+    if (!t) return;
+    label = t.text;
+    state.todos = state.todos.filter(function (x) { return x.id !== p.id; });
+  }
+
+  var ok = saveData();
+
+  /*
+   * 先把节点从页面上摘掉，再决定显示哪种状态。
+   * 顺序反过来的话，删光最后一条时会先切到空状态 —— 那个被隐藏的区块里
+   * 就留着一个「已经删掉、却还在 DOM 里」的卡片（眼睛看不见，但它确实在）。
+   */
+  if (p.type === 'habit') dropHabitNode(p.id);
+  else dropTodoNode(p.id);
+
+  if (isBlank()) {
+    setState('empty');               /* 全删光了 → 回到空状态 */
+  } else {
+    /* 删掉的可能正好是筛出来的最后一条 → 补上区块的说明文字，别留一片空白 */
+    syncBlockEmpty('habit', visibleHabits().length);
+    syncBlockEmpty('todo', visibleTodos().length);
+    renderHints();
+  }
+
+  showToast(ok ? ('已删除 · ' + label) : '没能存住：这次改动关掉浏览器就没了');
+}
+
+/* ==================== 十二、绑定事件 ==================== */
+
+/*
+ * 筛选条：点哪个按钮就按哪个筛。
+ * 用 <button> 而不是自己画一排 div，键盘那部分是白拿的 ——
+ * Tab 能走到、Enter / 空格按得下去、焦点环由 :focus-visible 统一给。
+ */
+el('filter-bar').addEventListener('click', function (ev) {
+  var btn = ev.target.closest('.filter-btn');
+  if (!btn) return;
+  setFilter(btn.dataset.filter);
+});
+
+/* 习惯卡片：点勾选圈 = 切换今天；点「删除」= 先问一遍 */
 el('habit-grid').addEventListener('click', function (ev) {
-  var btn = ev.target.closest('[data-act="toggle-habit"]');
+  var btn = ev.target.closest('[data-act]');
   if (!btn) return;
   var card = btn.closest('.habit-card');
   if (!card) return;
-  toggleHabitToday(card.dataset.id);
+
+  if (btn.dataset.act === 'toggle-habit') toggleHabitToday(card.dataset.id);
+  else if (btn.dataset.act === 'del-habit') askDelete('habit', card.dataset.id);
 });
 
+/* 待办行：点勾选框 = 切换完成；点 × = 先问一遍 */
 el('todo-list').addEventListener('click', function (ev) {
-  var btn = ev.target.closest('[data-act="toggle-todo"]');
+  var btn = ev.target.closest('[data-act]');
   if (!btn) return;
   var row = btn.closest('.todo-row');
   if (!row) return;
-  toggleTodo(row.dataset.id);
+
+  if (btn.dataset.act === 'toggle-todo') toggleTodo(row.dataset.id);
+  else if (btn.dataset.act === 'del-todo') askDelete('todo', row.dataset.id);
 });
 
-/* 空状态：加一条示例习惯 —— 只加「早睡」一条，待办一条都不加 */
-el('btn-seed').addEventListener('click', function () {
-  demoMode = 'seed';
-  load();
+/* 底部输入框：回车 / 点「加」 */
+el('todo-form').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  var input = el('todo-input');
+  if (addTodo(input.value)) input.value = '';
+  input.focus();
 });
 
-/* 出错状态：重试一次 */
-el('btn-retry').addEventListener('click', function () {
-  demoMode = 'success';
-  load();
+/* 两个「新建习惯」入口：区块标题旁边那个 + 空状态里那个 */
+el('btn-new-habit').addEventListener('click', openHabitForm);
+el('btn-empty-new-habit').addEventListener('click', openHabitForm);
+
+/* 空状态里的示例习惯：只加「早睡」一条，待办一条都不加 */
+el('btn-example-habit').addEventListener('click', function () {
+  addHabit('早睡', 'daily', 7);
 });
 
-/* 底部演示条：手动切四种状态 */
-(function bindDevbar() {
-  var btns = document.querySelectorAll('[data-demo]');
-  for (var i = 0; i < btns.length; i++) {
-    btns[i].addEventListener('click', function () {
-      demoMode = this.dataset.demo;
-      load();
-    });
+/* 新建习惯弹层 */
+el('habit-freq').addEventListener('change', syncFreqField);
+el('habit-cancel').addEventListener('click', closeHabitForm);
+el('habit-save').addEventListener('click', saveHabitForm);
+
+/* 表单里按回车＝保存 */
+el('habit-mask').addEventListener('keydown', function (ev) {
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    saveHabitForm();
   }
-})();
+});
+
+/* 删除确认弹层 */
+el('confirm-cancel').addEventListener('click', closeConfirm);
+el('confirm-ok').addEventListener('click', runDelete);
+
+/* 读不出来时的重试 */
+el('btn-retry').addEventListener('click', load);
+
+/* ==================== 十三、弹层的通用关闭方式 ==================== */
+
+el('habit-mask').addEventListener('click', function (ev) {
+  if (ev.target === this) closeHabitForm();
+});
+
+el('confirm-mask').addEventListener('click', function (ev) {
+  if (ev.target === this) closeConfirm();
+});
+
+/* 按 Esc 关最上面那个弹层 */
+document.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Escape') return;
+  if (!el('habit-mask').hidden) { closeHabitForm(); return; }
+  if (!el('confirm-mask').hidden) { closeConfirm(); return; }
+});
 
 /* ==================== 启动 ==================== */
 

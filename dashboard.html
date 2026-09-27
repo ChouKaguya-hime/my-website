@@ -10,19 +10,18 @@
 <body>
   <div class="app">
 
-    <!-- ============ 顶栏：标题 + 状态标签 ============ -->
+    <!-- ============ 顶栏：标题 + 日期 + 今天完成进度 ============ -->
     <header class="topbar">
       <div class="topbar-left">
         <h1 class="app-title">习惯看板</h1>
         <span class="today-date" id="today-date">—</span>
       </div>
       <div class="topbar-right">
-        <span class="source-tag">数据来源：本地假数据</span>
-        <span class="state-badge" id="state-badge">加载中</span>
+        <span class="topbar-progress">今天已完成 <strong id="today-count">0 / 0</strong> 件</span>
       </div>
     </header>
 
-    <!-- ============ 主视图：四种状态在这里切换 ============ -->
+    <!-- ============ 主视图：状态在这里切换 ============ -->
     <main class="board">
 
       <!-- ---------- 状态①：加载中（骨架屏） ---------- -->
@@ -43,12 +42,37 @@
 
       <!-- ---------- 状态②：有数据 ---------- -->
       <section class="state" id="state-success" hidden>
+
+        <!--
+          完成状态筛选（v1.2 / AC-16）：点一下，习惯区和待办区**同时**收敛。
+          ·
+          role="group" + aria-label：让读屏软件知道这三个按钮是一组的、组名叫什么。
+          aria-pressed：把「哪个正被选中」直接说给读屏软件，不靠视觉高亮去猜。
+          做成一排 <button> 而不是 <select>：三个选项一目了然，点一下就到，
+          也天然能被 Tab 到、被 Enter / 空格按下去。
+          ·
+          结果数量写在 aria-live 区里 —— 切换时读屏软件会自动播报
+          「筛选后：3 个习惯 · 2 条待办」，眼睛看不见高亮的人也能知道筛出了几条。
+        -->
+        <div class="filter-bar" id="filter-bar" role="group" aria-label="按完成状态筛选">
+          <span class="filter-label">筛选</span>
+          <button type="button" class="filter-btn is-on" data-filter="all" aria-pressed="true">全部</button>
+          <button type="button" class="filter-btn" data-filter="open" aria-pressed="false">未完成</button>
+          <button type="button" class="filter-btn" data-filter="done" aria-pressed="false">已完成</button>
+          <span class="filter-state" id="filter-state" role="status" aria-live="polite"></span>
+        </div>
+
         <section class="block">
           <div class="block-head">
             <h2 class="block-title">今天的习惯</h2>
-            <span class="block-hint" id="habit-hint"></span>
+            <div class="block-head-right">
+              <span class="block-hint" id="habit-hint"></span>
+              <button type="button" class="btn btn-primary btn-sm" id="btn-new-habit">＋ 新建习惯</button>
+            </div>
           </div>
           <div class="card-grid" id="habit-grid"></div>
+          <!-- 筛完一条都不剩时显示的一句话。留空态文案，不留空白区块（AC-16 的第 2 种情况） -->
+          <p class="block-empty" id="habit-empty" hidden></p>
         </section>
 
         <section class="block">
@@ -57,6 +81,7 @@
             <span class="block-hint" id="todo-hint"></span>
           </div>
           <ul class="todo-list" id="todo-list"></ul>
+          <p class="block-empty" id="todo-empty" hidden></p>
         </section>
       </section>
 
@@ -65,30 +90,33 @@
         <div class="empty-mark"></div>
         <h2 class="state-title">还什么都没有</h2>
         <p class="state-text">看板第一次打开时就是这样。加一个习惯，它就开始记了。</p>
-        <button type="button" class="btn btn-primary" id="btn-seed">加一个示例：早睡</button>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary" id="btn-empty-new-habit">＋ 新建习惯</button>
+          <button type="button" class="btn" id="btn-example-habit">加一个示例：早睡</button>
+        </div>
       </section>
 
-      <!-- ---------- 状态④：出错 ---------- -->
+      <!-- ---------- 状态④：读不出存储 ---------- -->
       <section class="state state-center" id="state-error" hidden>
         <div class="error-mark"></div>
-        <h2 class="state-title">没能拿到数据</h2>
-        <p class="state-text">大概是网络没通，或者服务还没起来。数据一条都没丢，重试一下就行。</p>
+        <h2 class="state-title">读不出本地数据</h2>
+        <p class="state-text">浏览器可能禁用了本地存储（比如无痕模式）。数据一条都没被改动，重试一下就行。</p>
         <button type="button" class="btn btn-primary" id="btn-retry">重试</button>
       </section>
 
     </main>
 
-    <!-- ============ 底部演示条：手动切四种状态 ============ -->
-    <footer class="devbar">
-      <span class="devbar-label">页面状态</span>
-      <div class="devbar-btns">
-        <button type="button" data-demo="loading">加载中</button>
-        <button type="button" data-demo="success">有数据</button>
-        <button type="button" data-demo="empty">空</button>
-        <button type="button" data-demo="error">出错</button>
-      </div>
-      <span class="devbar-note">演示用；接真实接口后这一条会删掉</span>
-    </footer>
+    <!-- ============ 底部常驻输入框：一句话加待办（与今日页同一个位置） ============ -->
+    <form class="addbar" id="todo-form" autocomplete="off">
+      <input
+        type="text"
+        id="todo-input"
+        class="addbar-input"
+        placeholder="记一件事，按回车就加进今天的待办"
+        maxlength="120"
+        aria-label="新增待办">
+      <button type="submit" class="btn btn-primary" id="todo-add">加</button>
+    </form>
 
     <!-- ============ 状态提示条：每次操作后短暂出现，把「刚刚做了什么」写成一句话 ============ -->
     <!--
@@ -98,6 +126,53 @@
     -->
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
+  </div>
+
+  <!-- ================= 弹层①：新建 / 编辑习惯 ================= -->
+  <!--
+    和今日页用同一套字段（PRD 6.1）：名称必填，频率有默认值，不改也能存。
+  -->
+  <div class="mask" id="habit-mask" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="habit-form-title">
+      <h3 class="dialog-title" id="habit-form-title">新建习惯</h3>
+
+      <label class="field">
+        <span class="field-label">名称</span>
+        <input type="text" id="habit-name" placeholder="比如：早睡" maxlength="30" autocomplete="off">
+      </label>
+
+      <label class="field">
+        <span class="field-label">频率</span>
+        <select id="habit-freq">
+          <option value="daily">每天</option>
+          <option value="weekly">每周 N 次</option>
+        </select>
+      </label>
+
+      <label class="field" id="freq-count-field" hidden>
+        <span class="field-label">每周几次</span>
+        <input type="number" id="habit-freq-count" min="1" max="7" value="3">
+      </label>
+
+      <p class="form-error" id="habit-form-error" hidden></p>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="habit-cancel">取消</button>
+        <button type="button" class="btn btn-primary" id="habit-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 弹层②：删除二次确认（习惯 / 待办共用） ================= -->
+  <div class="mask" id="confirm-mask" hidden>
+    <div class="dialog dialog-small" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h3 class="dialog-title" id="confirm-title">确定删除？</h3>
+      <p class="dialog-text" id="confirm-text">删掉之后找不回来。</p>
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="confirm-cancel">取消</button>
+        <button type="button" class="btn btn-danger" id="confirm-ok">删除</button>
+      </div>
+    </div>
   </div>
 
   <!-- 普通 script 引入（T2：不用模块写法，file:// 下模块会被跨域拦） -->
