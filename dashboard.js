@@ -1,7 +1,14 @@
 /* ==========================================================================
-   习惯看板 · 主视图逻辑（Day 12｜第 2 周）
+   习惯看板 · 主视图逻辑（Day 13｜第 2 周）
    --------------------------------------------------------------------------
-   这一版把 Day 8 的「本地假数据」换成了**真实的浏览器本地存储**。
+   ⭐ Day 13 这一版：把这一页变成**装着三个视图的外壳**，视图之间靠地址栏的 # 切换。
+        #/board        看板（默认）—— 今天的习惯 + 今天的待办，同屏
+        #/habit/<id>   习惯详情（二级）—— 某个习惯最近 28 天的记录，带面包屑 + 返回
+        #/states       状态自查（验收用）—— 四种状态并排看一遍；接真实接口后连同入口删掉
+      为什么选 hash 路由，而不是路由库 / History API / 纯隐藏显示：
+      见本文件末尾「十四、视图路由（Day 13）」那一段的注释。
+
+   （Day 12）这一版把 Day 8 的「本地假数据」换成了**真实的浏览器本地存储**。
 
    ⭐ 最关键的一件事：它和今日页（app.js）读写的是
       **同一个存储键 + 同一套字段**（PRD 第 6.1 节）。
@@ -10,7 +17,8 @@
 
    结构（Day 8 搭的那三层原样保留，只把最底下取数据的地方换掉了）：
 
-       存储层 loadData / saveData  →  渲染 render*()  →  状态机 setState()
+       存储层 loadData / saveData  →  渲染 render*()  →  状态机 setViewState()
+       视图路由 parseRoute / renderRoute（Day 13）在中间插了一层「先决定看哪一屏」
 
    必须守的硬约束（TECH_DESIGN 第 6 节 T1–T8）：
      T1 不引任何外部资源      T2 不用 ES Module（不用 import / export）
@@ -114,6 +122,23 @@ function lastNDays(n) {
   for (var i = n - 1; i >= 0; i--) {
     out.push(shiftDate(todayStr(), -i));
   }
+  return out;
+}
+
+/*
+ * 28 个格子按「自然周」对齐成 4 行 × 7 列 —— 和今日页详情弹层**同一套算法**。
+ *   起点 = 本周周一再往前 3 周，终点 = 本周周日。
+ * 为什么不用「纯过去 28 天」：只有对齐到自然周，本周今天之后的那几格
+ * 才是真的「还没到」，图例里的三种状态才都有东西可指；
+ * 而且同一个习惯在两个页面里，格子位置必须长得一样。
+ */
+function build28Dates() {
+  var t = todayStr();
+  var dow = parseDate(t).getDay();                 /* 0 = 周日 */
+  var backToMon = (dow === 0 ? 6 : dow - 1);
+  var start = shiftDate(t, -(backToMon + 21));
+  var out = [];
+  for (var i = 0; i < 28; i++) out.push(shiftDate(start, i));
   return out;
 }
 
@@ -268,20 +293,34 @@ function setFilter(name) {
 /* ==================== 四、状态机 ==================== */
 
 /*
- * 页面有这几种状态，任何时刻只显示其中一种。
+ * 每一种「视图」都有这几种状态，任何时刻只显示其中一种。
  *
- * 关于 loading（骨架屏）：本地存储是同步读的，所以它在真实数据下几乎不会被看到。
+ * 看板视图用全四种；习惯详情视图也有自己的四种（「空」= 这个习惯还一次都没完成过，
+ * 「出错」= 找不到这个习惯 / 读不出存储）—— 见第十四节。
+ *
+ * 关于 loading（骨架屏）：本地存储是同步读的，所以真实数据下它一闪而过。
  * 保留它是因为第 3 周接上真实接口后，读数据会变成真的「要等」，那时它就是活的。
  * error 则是有真实触发条件的：浏览器禁用了本地存储，或者存的内容已经不是合法 JSON。
  */
 var STATES = ['loading', 'success', 'empty', 'error'];
-var currentState = 'loading';
 
-function setState(name) {
-  currentState = name;
-  STATES.forEach(function (s) {
-    el('state-' + s).hidden = (s !== name);
-  });
+/* 看板视图当前停在哪个状态。新增 / 删除之后要靠它决定「要不要整页切过去」 */
+var boardState = 'loading';
+
+/**
+ * 切某个视图内部的状态。
+ * 用 data-state 而不是 id 来找节点 —— 因为「加载中」这一种样子，
+ * 看板和习惯详情两个视图各有一份，它们不该各写一套代码。
+ */
+function setViewState(view, name) {
+  var root = el('view-' + view);
+  if (!root) return;
+
+  var nodes = root.querySelectorAll('.state');
+  for (var i = 0; i < nodes.length; i++) {
+    nodes[i].hidden = nodes[i].dataset.state !== name;
+  }
+  if (view === 'board') boardState = name;
 }
 
 /* ==================== 五、渲染 ==================== */
@@ -309,10 +348,12 @@ function findTodo(id) {
  * 单独抽出来是为了能「只换这一张」——局部更新和整批渲染复用同一套拼装代码，
  * 不会出现「重画时一种样子、点一下变另一种样子」的偏差（Day 11）。
  */
-function buildHabitCard(h) {
+function buildHabitCard(h, opts) {
   var s = calcStrength(h);
   var done = Array.isArray(h.doneDates) ? h.doneDates : [];
   var doneToday = isDoneToday(h);
+  /* 名字是否做成通往详情页的链接。例外只有一个：状态自查页里的示例卡片不是真习惯，不能点 */
+  var asLink = !(opts && opts.link === false);
 
   var card = document.createElement('article');
   card.className = 'habit-card' + (doneToday ? ' is-done' : '');
@@ -322,9 +363,22 @@ function buildHabitCard(h) {
   var top = document.createElement('div');
   top.className = 'card-top';
 
+  /*
+   * 名字做成链接，而不是给整张卡片绑点击：
+   *   · 语义对 —— 它确实是「跳到另一个视图」
+   *   · Tab 能走到、Enter 能进、右键「在新标签页打开」—— 全是白拿的
+   *   · 和勾选圈 / 删除按钮各管各的，不会互相抢点击
+   */
   var name = document.createElement('h3');
   name.className = 'card-name';
-  name.textContent = h.name;
+  if (asLink) {
+    var nameLink = document.createElement('a');
+    nameLink.href = '#/habit/' + encodeURIComponent(h.id);
+    nameLink.textContent = h.name;
+    name.appendChild(nameLink);
+  } else {
+    name.textContent = h.name;
+  }
 
   var check = document.createElement('button');
   check.type = 'button';
@@ -606,33 +660,45 @@ function syncTodoAfterToggle(id) {
   }
 }
 
-/* ==================== 七、加载 ==================== */
+/* ==================== 七、加载（看板视图） ==================== */
 
-function load() {
-  var data = loadData();
+/*
+ * 进入看板视图：先摆出「加载中」，再读数据，按结果落到 成功 / 空 / 出错。
+ *
+ * 为什么要绕一次（afterPaint）：本地存储是同步读的，直接读、直接画的话，
+ * 「加载中」这一帧会被浏览器合并掉 —— 屏幕上从来没出现过它。
+ * 绕一次事件循环，加载态才是**真的存在过**的（自动化测试能断言到），
+ * 也让第 3 周把数据换成网络请求时，这里的写法一行都不用改。
+ */
+function enterBoard() {
+  setViewState('board', 'loading');
 
-  /* 读不出来 → 出错状态。数据一条都没被动过，给个「重试」就行 */
-  if (data === null) {
-    setState('error');
-    return;
-  }
+  afterPaint(function () {
+    var data = loadData();
 
-  state = data;
+    /* 读不出来 → 出错状态。数据一条都没被动过，给个「重试」就行 */
+    if (data === null) {
+      setViewState('board', 'error');
+      return;
+    }
 
-  /*
-   * 每次进来（含点「重试」）都把筛选复位成「全部」。
-   * 因为 filter 从来不落盘 —— 它是「我现在想看什么」，不是这个页面的设置项。
-   */
-  filter = 'all';
-  syncFilterButtons();
+    state = data;
 
-  if (isBlank()) {
-    setState('empty');
-    return;
-  }
+    /*
+     * 每次进来（含点「重试」）都把筛选复位成「全部」。
+     * 因为 filter 从来不落盘 —— 它是「我现在想看什么」，不是这个页面的设置项。
+     */
+    filter = 'all';
+    syncFilterButtons();
 
-  renderAll();
-  setState('success');
+    if (isBlank()) {
+      setViewState('board', 'empty');
+      return;
+    }
+
+    renderAll();
+    setViewState('board', 'success');
+  });
 }
 
 /* ==================== 八、写操作 ==================== */
@@ -665,9 +731,9 @@ function addHabit(name, freqType, freqCount) {
   var ok = saveData();
   var switched = false;
 
-  if (currentState === 'empty') {
+  if (boardState === 'empty') {
     renderAll();
-    setState('success');
+    setViewState('board', 'success');
   } else if (!habitVisible(h)) {
     /*
      * 当前筛选看不见这条（比如正筛着「已完成」，却新建了一个还没做的习惯）。
@@ -749,9 +815,9 @@ function addTodo(text) {
   var ok = saveData();
   var switched = false;
 
-  if (currentState === 'empty') {
+  if (boardState === 'empty') {
     renderAll();
-    setState('success');
+    setViewState('board', 'success');
   } else if (!todoVisible(t)) {
     /* 同上：正筛着「已完成」时新加一条还没做的，看不见它 —— 切回「全部」让人看见 */
     setFilter('all');
@@ -898,6 +964,17 @@ function runDelete() {
   var ok = saveData();
 
   /*
+   * 在「习惯详情」那一屏里删的：删完这一屏就没内容了，退回看板。
+   * 退的时候是改 hash（而不是直接切显示）—— 地址栏、浏览器返回键、
+   * 前进后退记录就全都一致了，这正是用 hash 路由白拿的好处。
+   */
+  if (p.type === 'habit' && currentView === 'habit') {
+    location.hash = '#/board';
+    showToast(ok ? ('已删除 · ' + label) : '没能存住：这次改动关掉浏览器就没了');
+    return;
+  }
+
+  /*
    * 先把节点从页面上摘掉，再决定显示哪种状态。
    * 顺序反过来的话，删光最后一条时会先切到空状态 —— 那个被隐藏的区块里
    * 就留着一个「已经删掉、却还在 DOM 里」的卡片（眼睛看不见，但它确实在）。
@@ -906,7 +983,7 @@ function runDelete() {
   else dropTodoNode(p.id);
 
   if (isBlank()) {
-    setState('empty');               /* 全删光了 → 回到空状态 */
+    setViewState('board', 'empty');  /* 全删光了 → 回到空状态 */
   } else {
     /* 删掉的可能正好是筛出来的最后一条 → 补上区块的说明文字，别留一片空白 */
     syncBlockEmpty('habit', visibleHabits().length);
@@ -987,7 +1064,7 @@ el('confirm-cancel').addEventListener('click', closeConfirm);
 el('confirm-ok').addEventListener('click', runDelete);
 
 /* 读不出来时的重试 */
-el('btn-retry').addEventListener('click', load);
+el('btn-retry').addEventListener('click', enterBoard);
 
 /* ==================== 十三、弹层的通用关闭方式 ==================== */
 
@@ -1006,7 +1083,236 @@ document.addEventListener('keydown', function (ev) {
   if (!el('confirm-mask').hidden) { closeConfirm(); return; }
 });
 
+/* ==================== 十四、视图路由（Day 13） ==================== */
+
+/*
+ * 问题：三个视图之间怎么切？
+ *
+ * 摆过四条路，只留下最后一条 —— 因为前三条都被本项目的硬约束挡掉了：
+ *
+ *   ① 路由库（React Router 那一类）
+ *      ✗ 要跑构建。而 AC-1 是「双击 index.html 就能开」，T2 又禁止 ES Module
+ *        （file:// 下会被跨域拦成白屏）—— 连加载都加载不起来。
+ *   ② History API（pushState / replaceState）
+ *      ✗ **file:// 协议下浏览器直接抛 SecurityError**。URL 是好看，
+ *        可一放到本地文件上整个坏掉，等于放弃 AC-1。
+ *   ③ 纯 JS 显示 / 隐藏，地址栏不动
+ *      ✓ 能用，但地址栏永远是那副样子：刷新回默认视图、不能收藏到具体一屏、
+ *        浏览器返回键退不回去。这是训练营给的「卡住时的降级方案」，能不用就不用。
+ *   ④ hash 路由（← 选它）
+ *      ✓ file:// 和 localhost 都能用（改 # 不触发跨域限制）
+ *      ✓ 零依赖 —— hashchange 是浏览器原生事件，一行库都不用引
+ *      ✓ 地址栏会跟着变 → 能收藏、能分享，**浏览器自带的前进 / 后退立刻可用**
+ *      ✓ 训练营那句「够用就好」：我们要的只是「切视图 + 能回退」，
+ *        这点需求不值得背上一个路由库
+ *
+ * 还有一个白拿的好处：**深链接**。把 #/habit/xxx 直接贴进地址栏回车，
+ * 一进来就是那个习惯的详情页，不用先走看板再点卡片。
+ */
+
+var VIEWS = ['board', 'habit', 'states'];
+var currentView = 'board';
+
+/* 习惯详情视图里正在看的那个习惯 */
+var detailHabitId = null;
+
+/**
+ * 把地址栏里的 hash 翻译成「现在该看哪个视图」。
+ * 认不出的 hash **一律回看板**，而不是留一屏空白 —— 白屏是最难排查的一种坏。
+ */
+function parseRoute() {
+  var raw = String(location.hash || '').replace(/^#\/?/, '');   /* "#/habit/h_x" → "habit/h_x" */
+  if (!raw) return { name: 'board', param: '' };
+
+  var parts = raw.split('/');
+  var name = parts[0];
+  var param = parts.slice(1).join('/');
+
+  if (name === 'habit' && param) return { name: 'habit', param: decodeURIComponent(param) };
+  if (name === 'states') return { name: 'states', param: '' };
+  return { name: 'board', param: '' };
+}
+
+/** 当前视图高亮：眼睛靠底线 + 加粗，读屏软件靠 aria-current，两边都有说法 */
+function syncNav(name) {
+  var links = document.querySelectorAll('.nav-link[data-nav]');
+  for (var i = 0; i < links.length; i++) {
+    if (links[i].dataset.nav === name) links[i].setAttribute('aria-current', 'page');
+    else links[i].removeAttribute('aria-current');
+  }
+}
+
+/**
+ * 换一屏：三个视图都躺在 DOM 里，这里只决定谁露脸。
+ * 不重建页面，所以滚动位置、填了一半的表单都不会被冲掉。
+ */
+function showView(name) {
+  VIEWS.forEach(function (v) {
+    var node = el('view-' + v);
+    if (node) node.hidden = (v !== name);
+  });
+
+  /* 底部「一句话加待办」只属于看板。别的视图里它没有意义，留着只会误导 */
+  el('todo-form').hidden = (name !== 'board');
+
+  syncNav(name);
+  currentView = name;
+  window.scrollTo(0, 0);
+}
+
+/** 等这一帧画完再干活 —— 让「加载中」真的被画到屏幕上过，而不是被浏览器合并掉 */
+function afterPaint(fn) {
+  requestAnimationFrame(function () { setTimeout(fn, 0); });
+}
+
+/** 进入「习惯详情」：三种结果 —— 有记录 / 一次都没完成过 / 找不到（出错） */
+function enterHabit(id) {
+  detailHabitId = id;
+  setViewState('habit', 'loading');
+
+  afterPaint(function () {
+    var data = loadData();
+
+    /* 存储读不出来 → 出错。和看板那屏的「读不出」是同一件事，文案分开说 */
+    if (data === null) {
+      el('hd-error-title').textContent = '读不出本地数据';
+      el('hd-error-text').textContent =
+        '浏览器可能禁用了本地存储（比如无痕模式）。数据一条都没被改动，回看板重试一下就行。';
+      setViewState('habit', 'error');
+      return;
+    }
+    state = data;
+
+    /* 找不到这个习惯 → 也是出错。最常见的原因：这条链接是旧的，习惯已经被删了 */
+    var h = findHabit(id);
+    if (!h) {
+      el('hd-error-title').textContent = '找不到这个习惯';
+      el('hd-error-text').textContent = '它可能已经被删掉了，或者这条地址是旧的。';
+      setViewState('habit', 'error');
+      return;
+    }
+
+    var done = Array.isArray(h.doneDates) ? h.doneDates : [];
+
+    /*
+     * 这里的「空」= 习惯在、但一次都还没完成过。
+     * 它和「找不到」必须分开说 —— 前者是「还没开始」，后者是「出事了」；
+     * 混成一句会让人以为记录丢了（守设计原则 1：不制造惩罚性反馈）。
+     */
+    if (done.length === 0) {
+      el('hd-empty-text').textContent =
+        '「' + h.name + '」还没有勾过任何一天。回看板给它勾一个，这里就有格子亮起来了。';
+      setViewState('habit', 'empty');
+      return;
+    }
+
+    renderHabitDetail(h);
+    /*
+     * 顶栏那句「今天已完成 N / M 件」是全局的，不该跟着视图变。
+     * 进详情页时也读了一遍数据，这里补算一次 ——
+     * 否则「直接深链接打开详情页」会一直卡在「0 / 0」，看着像数据丢了。
+     */
+    renderHints();
+    setViewState('habit', 'success');
+  });
+}
+
+/** 把某个习惯铺进详情视图（28 天格子 + 本周强度） */
+function renderHabitDetail(h) {
+  var done = Array.isArray(h.doneDates) ? h.doneDates : [];
+  var s = calcStrength(h);
+  var today = todayStr();
+
+  el('hd-name').textContent = h.name;
+  el('hd-freq').textContent = freqText(h);
+  el('hd-strength').textContent = s.text;
+  el('hd-bar').style.width = s.percent + '%';
+
+  var grid = el('hd-grid');
+  grid.textContent = '';
+
+  build28Dates().forEach(function (d) {
+    var on = done.indexOf(d) !== -1;
+    var future = d > today;         /* ISO 格式的日期串可以直接比大小 */
+    var cell = document.createElement('div');
+    cell.className = 'gcell'
+      + (on ? ' on' : '')
+      + (future ? ' future' : '')
+      + (d === today ? ' today' : '');
+    cell.textContent = parseDate(d).getDate();
+    cell.title = humanDate(d) + (future ? '：还没到' : (on ? '：已完成' : '：没做'));
+    grid.appendChild(cell);
+  });
+}
+
+/** 进入「状态自查」：四种状态并排，给验收和截图看的一屏 */
+function enterStates() {
+  /*
+   * 顶栏那句「今天已完成 N / M 件」是全局的，四个视图里都该是真的。
+   * 这里只**读**一次存储、只更新那几个数字，一个字节都不写回去 ——
+   * 页面里展示的内容仍然全是固定样例。
+   */
+  var data = loadData();
+  if (data) {
+    state = data;
+    renderHints();
+  }
+
+  renderStatesDemo();
+}
+
+var demoBuilt = false;
+
+/*
+ * 用一份固定样例，调**真实的组件函数**（buildHabitCard / buildTodoRow）拼出来 ——
+ * 所以这一屏看到的样子，就是真实视图里的样子，不会出现「说明书和实物不一致」。
+ * 注意：只读不写，完全不碰 localStorage —— 验收用的东西不该动用户的数据。
+ */
+function renderStatesDemo() {
+  if (demoBuilt) return;
+  demoBuilt = true;
+
+  var box = el('demo-success');
+  if (!box) return;
+
+  var t = todayStr();
+  box.appendChild(buildHabitCard({
+    id: 'demo_habit',
+    name: '早睡',
+    freqType: 'daily',
+    freqCount: 7,
+    createdAt: t,
+    doneDates: [t, shiftDate(t, -1), shiftDate(t, -2), shiftDate(t, -4)]
+  }, { link: false }));   /* 示例卡片不是真习惯，名字不做成链接 —— 点了会撞进「找不到」 */
+
+  box.appendChild(buildTodoRow({
+    id: 'demo_todo',
+    text: '给绿萝浇水',
+    date: t,
+    done: true
+  }));
+}
+
+/** 路由总入口：地址栏一变就重跑（首次打开也跑一次） */
+function renderRoute() {
+  var r = parseRoute();
+  showView(r.name);
+
+  if (r.name === 'habit') enterHabit(r.param);
+  else if (r.name === 'states') enterStates();
+  else enterBoard();
+}
+
 /* ==================== 启动 ==================== */
 
 el('today-date').textContent = humanDate(todayStr());
-load();
+
+/* 详情页里的「删除这个习惯」 */
+el('hd-delete').addEventListener('click', function () {
+  if (detailHabitId) askDelete('habit', detailHabitId);
+});
+
+/* 地址栏的 hash 一变就换视图 —— 点导航 / 按浏览器返回键 / 手敲地址，走的都是这一条路 */
+window.addEventListener('hashchange', renderRoute);
+
+renderRoute();

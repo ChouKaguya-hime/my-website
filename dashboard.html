@@ -21,92 +21,232 @@
       </div>
     </header>
 
-    <!-- ============ 主视图：状态在这里切换 ============ -->
+    <!-- ============ 视图导航（Day 13 新增）============ -->
+    <!--
+      三个视图之间靠**地址栏里 # 后面的那一小段**切换 —— 这叫 hash 路由。
+      选它的理由（对比过另外两条路，见 README「Day 13」一节）：
+        · file:// 下也能用：History API 的 pushState 在 file:// 协议下会被浏览器直接拒绝
+        · 零依赖：只用浏览器原生的 hashchange 事件，不引任何路由库（训练营：够用就好）
+        · 地址栏会跟着变 → 能收藏、能分享、浏览器自带的前进 / 后退也立刻能用
+      当前正停在哪个视图，用 aria-current="page" 同时说给眼睛和读屏软件。
+    -->
+    <nav class="navbar" aria-label="视图导航">
+      <a class="nav-link" href="#/board" data-nav="board">看板</a>
+      <a class="nav-link" href="#/states" data-nav="states" title="验收用的一屏；接上真实接口后就删掉">状态自查</a>
+      <a class="nav-link nav-out" href="index.html">今日页 ↗</a>
+    </nav>
+
+    <!-- ============ 主区：三个视图，同一时刻只显示一个 ============ -->
     <main class="board">
 
-      <!-- ---------- 状态①：加载中（骨架屏） ---------- -->
-      <section class="state" id="state-loading">
-        <div class="skel-head"></div>
-        <div class="skel-grid">
-          <div class="skel-card"></div>
-          <div class="skel-card"></div>
-          <div class="skel-card"></div>
-          <div class="skel-card"></div>
-        </div>
-        <div class="skel-list">
-          <div class="skel-row"></div>
-          <div class="skel-row"></div>
-          <div class="skel-row"></div>
-        </div>
+      <!-- ================================================================
+           视图①：看板（默认；今天的习惯 + 今天的待办同屏 —— 守住设计原则 2）
+           ================================================================ -->
+      <section class="view" id="view-board">
+
+        <!-- ---------- 状态①：加载中（骨架屏） ---------- -->
+        <section class="state" data-state="loading">
+          <div class="skel-head"></div>
+          <div class="skel-grid">
+            <div class="skel-card"></div>
+            <div class="skel-card"></div>
+            <div class="skel-card"></div>
+            <div class="skel-card"></div>
+          </div>
+          <div class="skel-list">
+            <div class="skel-row"></div>
+            <div class="skel-row"></div>
+            <div class="skel-row"></div>
+          </div>
+        </section>
+
+        <!-- ---------- 状态②：有数据 ---------- -->
+        <section class="state" data-state="success" hidden>
+
+          <!--
+            完成状态筛选（v1.2 / AC-16）：点一下，习惯区和待办区**同时**收敛。
+            ·
+            role="group" + aria-label：让读屏软件知道这三个按钮是一组的、组名叫什么。
+            aria-pressed：把「哪个正被选中」直接说给读屏软件，不靠视觉高亮去猜。
+            做成一排 <button> 而不是 <select>：三个选项一目了然，点一下就到，
+            也天然能被 Tab 到、被 Enter / 空格按下去。
+            ·
+            结果数量写在 aria-live 区里 —— 切换时读屏软件会自动播报
+            「筛选后：3 个习惯 · 2 条待办」，眼睛看不见高亮的人也能知道筛出了几条。
+          -->
+          <div class="filter-bar" id="filter-bar" role="group" aria-label="按完成状态筛选">
+            <span class="filter-label">筛选</span>
+            <button type="button" class="filter-btn is-on" data-filter="all" aria-pressed="true">全部</button>
+            <button type="button" class="filter-btn" data-filter="open" aria-pressed="false">未完成</button>
+            <button type="button" class="filter-btn" data-filter="done" aria-pressed="false">已完成</button>
+            <span class="filter-state" id="filter-state" role="status" aria-live="polite"></span>
+          </div>
+
+          <section class="block">
+            <div class="block-head">
+              <h2 class="block-title">今天的习惯</h2>
+              <div class="block-head-right">
+                <span class="block-hint" id="habit-hint"></span>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-new-habit">＋ 新建习惯</button>
+              </div>
+            </div>
+            <div class="card-grid" id="habit-grid"></div>
+            <!-- 筛完一条都不剩时显示的一句话。留空态文案，不留空白区块（AC-16 的第 2 种情况） -->
+            <p class="block-empty" id="habit-empty" hidden></p>
+          </section>
+
+          <section class="block">
+            <div class="block-head">
+              <h2 class="block-title">今天的待办</h2>
+              <span class="block-hint" id="todo-hint"></span>
+            </div>
+            <ul class="todo-list" id="todo-list"></ul>
+            <p class="block-empty" id="todo-empty" hidden></p>
+          </section>
+        </section>
+
+        <!-- ---------- 状态③：空 ---------- -->
+        <section class="state state-center" data-state="empty" hidden>
+          <div class="empty-mark"></div>
+          <h2 class="state-title">还什么都没有</h2>
+          <p class="state-text">看板第一次打开时就是这样。加一个习惯，它就开始记了。</p>
+          <div class="state-actions">
+            <button type="button" class="btn btn-primary" id="btn-empty-new-habit">＋ 新建习惯</button>
+            <button type="button" class="btn" id="btn-example-habit">加一个示例：早睡</button>
+          </div>
+        </section>
+
+        <!-- ---------- 状态④：读不出存储 ---------- -->
+        <section class="state state-center" data-state="error" hidden>
+          <div class="error-mark"></div>
+          <h2 class="state-title">读不出本地数据</h2>
+          <p class="state-text">浏览器可能禁用了本地存储（比如无痕模式）。数据一条都没被改动，重试一下就行。</p>
+          <button type="button" class="btn btn-primary" id="btn-retry">重试</button>
+        </section>
       </section>
 
-      <!-- ---------- 状态②：有数据 ---------- -->
-      <section class="state" id="state-success" hidden>
+      <!-- ================================================================
+           视图②：习惯详情（二级视图 —— 从看板的卡片点进来）
+           这一屏回答的是「这一个习惯，最近怎么样」。
+           它是二级：上面有面包屑说明「从哪儿进来的」，下面有「← 返回看板」。
+           ================================================================ -->
+      <section class="view" id="view-habit" hidden>
 
-        <!--
-          完成状态筛选（v1.2 / AC-16）：点一下，习惯区和待办区**同时**收敛。
-          ·
-          role="group" + aria-label：让读屏软件知道这三个按钮是一组的、组名叫什么。
-          aria-pressed：把「哪个正被选中」直接说给读屏软件，不靠视觉高亮去猜。
-          做成一排 <button> 而不是 <select>：三个选项一目了然，点一下就到，
-          也天然能被 Tab 到、被 Enter / 空格按下去。
-          ·
-          结果数量写在 aria-live 区里 —— 切换时读屏软件会自动播报
-          「筛选后：3 个习惯 · 2 条待办」，眼睛看不见高亮的人也能知道筛出了几条。
-        -->
-        <div class="filter-bar" id="filter-bar" role="group" aria-label="按完成状态筛选">
-          <span class="filter-label">筛选</span>
-          <button type="button" class="filter-btn is-on" data-filter="all" aria-pressed="true">全部</button>
-          <button type="button" class="filter-btn" data-filter="open" aria-pressed="false">未完成</button>
-          <button type="button" class="filter-btn" data-filter="done" aria-pressed="false">已完成</button>
-          <span class="filter-state" id="filter-state" role="status" aria-live="polite"></span>
-        </div>
+        <!-- 面包屑：一眼看清「我在哪一层」。aria-current 标出当前这一层 -->
+        <nav class="crumb" aria-label="面包屑">
+          <a href="#/board">看板</a>
+          <span class="crumb-sep" aria-hidden="true">/</span>
+          <span class="crumb-now" aria-current="page">习惯详情</span>
+        </nav>
 
-        <section class="block">
-          <div class="block-head">
-            <h2 class="block-title">今天的习惯</h2>
-            <div class="block-head-right">
-              <span class="block-hint" id="habit-hint"></span>
-              <button type="button" class="btn btn-primary btn-sm" id="btn-new-habit">＋ 新建习惯</button>
+        <!-- ---------- 状态①：加载中 ---------- -->
+        <section class="state" data-state="loading">
+          <div class="skel-head"></div>
+          <div class="skel-row"></div>
+          <div class="skel-row"></div>
+        </section>
+
+        <!-- ---------- 状态②：有记录 ---------- -->
+        <section class="state" data-state="success" hidden>
+          <div class="detail-card">
+            <div class="detail-top">
+              <h2 class="detail-name" id="hd-name">—</h2>
+              <span class="detail-freq" id="hd-freq"></span>
+            </div>
+
+            <div class="detail-strength">
+              <div class="strength-line">
+                <span class="strength-label">本周强度</span>
+                <strong class="strength-value" id="hd-strength">—</strong>
+              </div>
+              <div class="bar"><div class="bar-fill" id="hd-bar" style="width:0%"></div></div>
+            </div>
+
+            <p class="detail-label">最近 28 天</p>
+            <div class="grid28" id="hd-grid"></div>
+            <div class="legend">
+              <span class="legend-item"><i class="dot dot-done"></i>已完成</span>
+              <span class="legend-item"><i class="dot dot-miss"></i>没做</span>
+              <span class="legend-item"><i class="dot dot-future"></i>还没到</span>
+            </div>
+
+            <div class="detail-actions">
+              <a class="btn" href="#/board">← 返回看板</a>
+              <button type="button" class="btn btn-danger-soft" id="hd-delete">删除这个习惯</button>
             </div>
           </div>
-          <div class="card-grid" id="habit-grid"></div>
-          <!-- 筛完一条都不剩时显示的一句话。留空态文案，不留空白区块（AC-16 的第 2 种情况） -->
-          <p class="block-empty" id="habit-empty" hidden></p>
         </section>
 
-        <section class="block">
-          <div class="block-head">
-            <h2 class="block-title">今天的待办</h2>
-            <span class="block-hint" id="todo-hint"></span>
-          </div>
-          <ul class="todo-list" id="todo-list"></ul>
-          <p class="block-empty" id="todo-empty" hidden></p>
+        <!-- ---------- 状态③：空（习惯在，但一次都还没完成过） ---------- -->
+        <section class="state state-center" data-state="empty" hidden>
+          <div class="empty-mark"></div>
+          <h2 class="state-title">还没有完成记录</h2>
+          <p class="state-text" id="hd-empty-text">这个习惯刚建好，还没有勾过任何一天。回到看板勾一个，这里就有格子亮起来了。</p>
+          <a class="btn btn-primary" href="#/board">回到看板</a>
+        </section>
+
+        <!-- ---------- 状态④：出错（找不到这个习惯 / 读不出存储） ---------- -->
+        <section class="state state-center" data-state="error" hidden>
+          <div class="error-mark"></div>
+          <h2 class="state-title" id="hd-error-title">找不到这个习惯</h2>
+          <p class="state-text" id="hd-error-text">它可能已经被删掉了。</p>
+          <a class="btn btn-primary" href="#/board">回到看板</a>
         </section>
       </section>
 
-      <!-- ---------- 状态③：空 ---------- -->
-      <section class="state state-center" id="state-empty" hidden>
-        <div class="empty-mark"></div>
-        <h2 class="state-title">还什么都没有</h2>
-        <p class="state-text">看板第一次打开时就是这样。加一个习惯，它就开始记了。</p>
-        <div class="state-actions">
-          <button type="button" class="btn btn-primary" id="btn-empty-new-habit">＋ 新建习惯</button>
-          <button type="button" class="btn" id="btn-example-habit">加一个示例：早睡</button>
+      <!-- ================================================================
+           视图③：状态自查（验收用的一屏，四种状态并排）
+           这不是给用户日常用的功能页 —— 是给「验收 / 截图」看的说明书：
+           同一套组件，四种状态各长什么样，放在一起对一遍。
+           第 3 周接上真实接口后，这一屏和导航里的入口一起删掉。
+           ================================================================ -->
+      <section class="view" id="view-states" hidden>
+        <p class="view-lead">
+          列表数据的四种状态并排放在这儿，方便一屏对完。内容是固定样例，<strong>不会动你的存储</strong>。
+        </p>
+
+        <div class="states-grid">
+
+          <article class="state-demo">
+            <h3 class="demo-title"><span class="demo-no">①</span>加载中</h3>
+            <p class="demo-note">数据还没到，先撑起骨架，别让页面空着。</p>
+            <div class="demo-body">
+              <div class="skel-row"></div>
+              <div class="skel-row"></div>
+              <div class="skel-row"></div>
+            </div>
+          </article>
+
+          <article class="state-demo">
+            <h3 class="demo-title"><span class="demo-no">②</span>正常</h3>
+            <p class="demo-note">拿到数据了，把列表画出来。</p>
+            <!-- 示例卡片由 JS 用真实组件拼（buildHabitCard / buildTodoRow），保证和真实视图一模一样 -->
+            <div class="demo-body" id="demo-success"></div>
+          </article>
+
+          <article class="state-demo">
+            <h3 class="demo-title"><span class="demo-no">③</span>空</h3>
+            <p class="demo-note">请求成功了，但一条数据都没有 —— 这和「出错」是两回事，要说清楚。</p>
+            <div class="demo-body demo-center">
+              <div class="empty-mark"></div>
+              <p class="demo-line">还没有习惯。点右上角的「＋ 新建习惯」加一个。</p>
+            </div>
+          </article>
+
+          <article class="state-demo">
+            <h3 class="demo-title"><span class="demo-no">④</span>出错</h3>
+            <p class="demo-note">数据没读出来。要留一条退路（重试 / 回退），别只说「失败了」。</p>
+            <div class="demo-body demo-center">
+              <div class="error-mark"></div>
+              <p class="demo-line">读不出本地数据。数据一条都没被改动，重试一下就行。</p>
+            </div>
+          </article>
         </div>
-      </section>
-
-      <!-- ---------- 状态④：读不出存储 ---------- -->
-      <section class="state state-center" id="state-error" hidden>
-        <div class="error-mark"></div>
-        <h2 class="state-title">读不出本地数据</h2>
-        <p class="state-text">浏览器可能禁用了本地存储（比如无痕模式）。数据一条都没被改动，重试一下就行。</p>
-        <button type="button" class="btn btn-primary" id="btn-retry">重试</button>
       </section>
 
     </main>
 
-    <!-- ============ 底部常驻输入框：一句话加待办（与今日页同一个位置） ============ -->
+    <!-- ============ 底部常驻输入框：一句话加待办（只有看板视图用它） ============ -->
     <form class="addbar" id="todo-form" autocomplete="off">
       <input
         type="text"

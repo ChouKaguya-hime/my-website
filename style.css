@@ -69,9 +69,27 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 .today-date { color: var(--muted); font-size: 13px; }
 
-.topbar-right { color: var(--muted); font-size: 13px; }
+.topbar-right {
+  color: var(--muted);
+  font-size: 13px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
 
 .topbar-right strong { color: var(--accent); font-size: 15px; }
+
+/*
+ * 顶栏右侧通往看板的链接（Day 13）。
+ * 它和看板里的 .nav-out 同名，但两个文件各管各的样式，互不影响。
+ */
+.nav-out { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.nav-out:hover { text-decoration: underline; }
+.nav-out:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 
 /* ---------------------------------------------------------------- 面板通用 */
 

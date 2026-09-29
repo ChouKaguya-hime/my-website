@@ -17,6 +17,7 @@
   --done: #3b6d11;
   --done-soft: #eaf3de;
   --cell-off: #e8e7e3;
+  --cell-future: #f4f3f0;   /* 还没到的日子（Day 13 详情视图用，与 style.css 同一套） */
   --danger: #a32d2d;
   --danger-soft: #fbeaea;
   --skeleton: #eceae5;
@@ -206,6 +207,19 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
   margin: 0;
   line-height: 1.4;
   word-break: break-word;
+}
+
+/*
+ * 卡片的标题是通往「习惯详情」那一屏的入口（Day 13）。
+ * 平时看着就是普通标题，鼠标移上去才显出是链接 —— 卡片上已经有勾选圈和删除，
+ * 再来个蓝色下划线的标题，一屏里太多「可点」的东西反而不知道点哪儿。
+ */
+.card-name a { color: inherit; text-decoration: none; }
+.card-name a:hover { color: var(--accent); text-decoration: underline; }
+.card-name a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .card-freq { color: var(--faint); font-size: 12px; margin: 0; }
@@ -488,6 +502,208 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 .addbar-input::placeholder { color: var(--faint); }
 
+/* ---------------------------------------------------------------- 视图外壳（Day 13） */
+
+/*
+ * .view 是「一屏」的容器。
+ * 三个视图**同时存在于 DOM 里**，靠 hidden 决定谁露脸 ——
+ * 所以切视图不重建页面，只是换谁显示（滚动位置、已填了一半的表单都不受影响）。
+ */
+.view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 视图说明（状态自查页顶部那一句） */
+.view-lead { color: var(--muted); font-size: 13px; margin: 0; max-width: 660px; }
+
+/* ---------------------------------------------------------------- 视图导航条（Day 13） */
+
+.navbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.nav-link {
+  display: inline-block;
+  padding: 7px 12px 9px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;        /* 把选中态的底线压在导航条那条细线上 */
+}
+
+.nav-link:hover { color: var(--text); }
+
+/* 当前停在哪个视图：加深字色 + 一条底线；aria-current 同时说给读屏软件 */
+.nav-link[aria-current="page"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* 「今日页」是跳到**另一个文件**的链接，和视图内切换区分开，推到最右边 */
+.nav-out { margin-left: auto; color: var(--accent); }
+.nav-out:hover { text-decoration: underline; }
+
+/* ---------------------------------------------------------------- 面包屑（Day 13） */
+
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.crumb a { color: var(--accent); text-decoration: none; }
+.crumb a:hover { text-decoration: underline; }
+.crumb-sep { color: var(--faint); }
+.crumb-now { color: var(--text); }
+
+/* ---------------------------------------------------------------- 习惯详情（Day 13） */
+
+.detail-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 22px 18px;
+  max-width: 580px;
+}
+
+.detail-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.detail-name { font-size: 18px; font-weight: 600; margin: 0; }
+.detail-freq { color: var(--muted); font-size: 13px; }
+
+.detail-strength { margin-bottom: 20px; }
+
+.strength-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.detail-label { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+
+/* 28 天网格：7 列 × 4 行，一眼看完最近四周 */
+.grid28 {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.gcell {
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: var(--cell-off);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--faint);
+}
+
+.gcell.on { background: var(--done); }
+.gcell.future { background: var(--cell-future); }
+.gcell.today { border-color: var(--accent); }
+
+.legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.dot-done { background: var(--done); }
+.dot-miss { background: var(--cell-off); }
+.dot-future { background: var(--cell-future); border: 1px solid var(--line); }
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* 详情里的「删除」要比卡片脚上那个明显一档：用户是专门点进来做这件事的 */
+.btn-danger-soft {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: #f0d3d3;
+}
+
+.btn-danger-soft:hover { background: #f6dcdc; }
+
+/* ------------------------------------------ 状态自查（Day 13，验收用的一屏） */
+
+.states-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.state-demo {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-title { font-size: 14px; font-weight: 600; margin: 0; }
+.demo-no { color: var(--accent); margin-right: 4px; }
+.demo-note { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+
+.demo-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.demo-center {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.demo-line { color: var(--muted); font-size: 12px; margin: 0; max-width: 260px; }
+
+/* 自查格里的小号骨架屏与标记：别占掉整屏 */
+.demo-body .skel-row { height: 30px; }
+.state-demo .empty-mark,
+.state-demo .error-mark { width: 36px; height: 36px; margin-bottom: 0; }
+.state-demo .empty-mark { border-radius: 10px; }
+.state-demo .error-mark { border-radius: 50%; }
+.state-demo .error-mark::after { width: 18px; }
+
+/* 自查格里的真实卡片：紧凑一点，四个格子才排得平 */
+.state-demo .habit-card { padding: 12px 14px; gap: 8px; }
+.state-demo .card-foot { display: none; }
+.state-demo .todo-row { padding: 9px 12px; }
+
 /* ---------------------------------------------------------------- 空 / 出错 */
 
 .state-center {
@@ -649,7 +865,12 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 .skel-list { display: flex; flex-direction: column; gap: 8px; }
 .skel-row { height: 46px; }
 
-#state-loading { display: flex; flex-direction: column; gap: 20px; }
+/*
+ * 加载中：骨架屏竖着排。
+ * 用 data-state 属性选中，而不是 id —— 因为看板和习惯详情**两个视图**
+ * 各有一块加载中，它们该长得一样（Day 13）。
+ */
+.state[data-state="loading"] { display: flex; flex-direction: column; gap: 16px; }
 
 @keyframes skel-pulse {
   0%, 100% { opacity: 1; }
@@ -665,6 +886,11 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 @media (max-width: 560px) {
   .app { padding: 16px 16px 20px; }
   .block-head-right { width: 100%; justify-content: space-between; }
+  /* 状态自查四格在窄屏收成一列，免得每格只剩几十像素宽 */
+  .states-grid { grid-template-columns: 1fr; }
+  /* 导航条上「今日页」不再往右推，跟着换行自然排 */
+  .nav-out { margin-left: 0; }
+  .detail-card { padding: 16px; }
 }
 
 /* ---------------------------------------------------------------- 无障碍 */
@@ -673,6 +899,15 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* 导航和面包屑是 <a>，也要有同样清楚的焦点环（Day 13） */
+.nav-link:focus-visible,
+.crumb a:focus-visible,
+.navbar .nav-out:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* 尊重系统的「减少动态效果」设置 */
