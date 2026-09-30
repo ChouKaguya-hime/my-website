@@ -281,6 +281,35 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 /* 勾完保留原位、变灰（F3 明确规定：不移走） */
 .todo-row.is-done .todo-text { color: var(--faint); text-decoration: line-through; }
 
+/*
+ * 待办行尾的删除（Day 14 新增，PRD F3「每条待办行尾一个删除按钮」）。
+ * 平时淡一点、不抢眼，鼠标移到这一行或键盘聚焦时才清晰 ——
+ * 删除是低频动作，但必须**一直都在**，不做成 hover 才凭空出现（那样手机上就没了）。
+ */
+.row-del {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.todo-row:hover .row-del,
+.row-del:focus-visible { opacity: 1; }
+
+.row-del:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+  opacity: 1;
+}
+
 /* ---------------------------------------------------------------- 空状态 */
 
 .empty {

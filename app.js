@@ -221,6 +221,40 @@ function renderHabits() {
   });
 }
 
+/*
+ * 拼出一条待办行：勾选框 + 一句话 + 行尾删除（PRD F3）。
+ * 单独抽成一个函数，好处是看板那边也是同一个形状（buildTodoRow），
+ * 两页的待办行长什么样、有哪些按钮，一眼能对上。
+ */
+function buildTodoRow(t) {
+  var li = document.createElement('li');
+  li.className = 'todo-row' + (t.done ? ' is-done' : '');
+  li.dataset.id = t.id;
+
+  var check = document.createElement('button');
+  check.type = 'button';
+  check.className = 'todo-check';
+  check.dataset.act = 'toggle-todo';
+  check.setAttribute('aria-label', (t.done ? '取消完成' : '标记完成') + '：' + t.text);
+
+  var text = document.createElement('span');
+  text.className = 'todo-text';
+  text.textContent = t.text;
+
+  /* Day 14 新增：行尾删除。点它只弹确认，不直接删（AC-15） */
+  var del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'row-del';
+  del.dataset.act = 'del-todo';
+  del.textContent = '×';
+  del.setAttribute('aria-label', '删除待办：' + t.text);
+
+  li.appendChild(check);
+  li.appendChild(text);
+  li.appendChild(del);
+  return li;
+}
+
 function renderTodos() {
   var list = el('todo-list');
   var emptyBox = el('todo-empty');
@@ -230,23 +264,7 @@ function renderTodos() {
   emptyBox.hidden = todos.length > 0;
 
   todos.forEach(function (t) {
-    var li = document.createElement('li');
-    li.className = 'todo-row' + (t.done ? ' is-done' : '');
-    li.dataset.id = t.id;
-
-    var check = document.createElement('button');
-    check.type = 'button';
-    check.className = 'todo-check';
-    check.dataset.act = 'toggle-todo';
-    check.setAttribute('aria-label', (t.done ? '取消完成' : '标记完成') + '：' + t.text);
-
-    var text = document.createElement('span');
-    text.className = 'todo-text';
-    text.textContent = t.text;
-
-    li.appendChild(check);
-    li.appendChild(text);
-    list.appendChild(li);
+    list.appendChild(buildTodoRow(t));
   });
 }
 
@@ -261,6 +279,14 @@ function render() {
 function findHabit(id) {
   for (var i = 0; i < state.habits.length; i++) {
     if (state.habits[i].id === id) return state.habits[i];
+  }
+  return null;
+}
+
+/* Day 14 补：删待办要用（看板里早就有，今日页一直缺，见 PRD F3 / AC-15） */
+function findTodo(id) {
+  for (var i = 0; i < state.todos.length; i++) {
+    if (state.todos[i].id === id) return state.todos[i];
   }
   return null;
 }
@@ -331,13 +357,18 @@ el('habit-list').addEventListener('click', function (ev) {
   }
 });
 
-/* 待办列表：点勾选框切换完成 */
+/* 待办列表：点勾选框切换完成，点行尾 × 走删除确认（Day 14 补上后者） */
 el('todo-list').addEventListener('click', function (ev) {
-  var btn = ev.target.closest('[data-act="toggle-todo"]');
+  var btn = ev.target.closest('[data-act]');
   if (!btn) return;
   var row = btn.closest('.todo-row');
   if (!row) return;
-  toggleTodo(row.dataset.id);
+
+  if (btn.dataset.act === 'toggle-todo') {
+    toggleTodo(row.dataset.id);
+  } else if (btn.dataset.act === 'del-todo') {
+    askDelete('todo', row.dataset.id);
+  }
 });
 
 /* 底部输入框：回车 / 点「加」 */
@@ -538,30 +569,67 @@ el('habit-mask').addEventListener('keydown', function (ev) {
   }
 });
 
-/* ==================== 九、删除二次确认（AC-12） ==================== */
+/* ==================== 九、删除二次确认（AC-12 / AC-15） ==================== */
 
-var pendingDeleteId = null;
+/*
+ * 习惯和待办**共用同一个确认弹层**，只有文案不同 ——
+ * 和看板 dashboard.js 里是同一套写法：确认这一步的交互只有一种，用户不用学两遍。
+ *
+ * Day 14 之前这里只认习惯（变量就叫 pendingDeleteId），
+ * 所以待办在今日页根本没有删除入口 —— 这是 PRD F3「行尾一个删除按钮」漏实现的后果。
+ */
+var pendingDelete = null;   /* { type: 'habit' | 'todo', id: string } */
+
+function askDelete(type, id) {
+  var title = el('confirm-title');
+  var text = el('confirm-text');
+
+  if (type === 'habit') {
+    var h = findHabit(id);
+    if (!h) return;
+    title.textContent = '删除这个习惯？';
+    text.textContent = '「' + h.name + '」和它的完成记录会一起没了，找不回来。';
+  } else {
+    var t = findTodo(id);
+    if (!t) return;
+    title.textContent = '删除这条待办？';
+    text.textContent = '「' + t.text + '」删掉之后找不回来。';
+  }
+
+  pendingDelete = { type: type, id: id };
+  openMask('confirm-mask');
+
+  /* 焦点给「取消」而不是「删除」：这一步本来就为了防误删，别让回车直接删掉 */
+  el('confirm-cancel').focus();
+}
+
+function closeConfirm() {
+  closeMask('confirm-mask');
+  pendingDelete = null;
+}
+
+function runDelete() {
+  if (!pendingDelete) return;
+
+  var p = pendingDelete;
+  closeConfirm();
+
+  if (p.type === 'habit') {
+    state.habits = state.habits.filter(function (h) { return h.id !== p.id; });
+    closeDetail();
+  } else {
+    state.todos = state.todos.filter(function (t) { return t.id !== p.id; });
+  }
+  commit();
+}
 
 el('detail-delete').addEventListener('click', function () {
   if (!detailHabitId) return;
-  pendingDeleteId = detailHabitId;
-  openMask('confirm-mask');
+  askDelete('habit', detailHabitId);
 });
 
-el('confirm-cancel').addEventListener('click', function () {
-  closeMask('confirm-mask');
-  pendingDeleteId = null;
-});
-
-el('confirm-ok').addEventListener('click', function () {
-  if (pendingDeleteId) {
-    state.habits = state.habits.filter(function (h) { return h.id !== pendingDeleteId; });
-    closeMask('confirm-mask');
-    closeDetail();
-    commit();
-  }
-  pendingDeleteId = null;
-});
+el('confirm-cancel').addEventListener('click', closeConfirm);
+el('confirm-ok').addEventListener('click', runDelete);
 
 /* ==================== 十、弹层的通用关闭方式 ==================== */
 
@@ -574,10 +642,7 @@ el('habit-mask').addEventListener('click', function (ev) {
 });
 
 el('confirm-mask').addEventListener('click', function (ev) {
-  if (ev.target === this) {
-    closeMask('confirm-mask');
-    pendingDeleteId = null;
-  }
+  if (ev.target === this) closeConfirm();
 });
 
 /* 按 Esc 关最上面那个弹层 */
@@ -585,11 +650,7 @@ document.addEventListener('keydown', function (ev) {
   if (ev.key !== 'Escape') return;
 
   if (!el('habit-mask').hidden) { closeHabitForm(); return; }
-  if (!el('confirm-mask').hidden) {
-    closeMask('confirm-mask');
-    pendingDeleteId = null;
-    return;
-  }
+  if (!el('confirm-mask').hidden) { closeConfirm(); return; }
   if (!el('detail-mask').hidden) closeDetail();
 });
 

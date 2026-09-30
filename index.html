@@ -128,11 +128,12 @@
     </div>
   </div>
 
-  <!-- ================= 弹层③：删除二次确认 ================= -->
+  <!-- ================= 弹层③：删除二次确认（习惯 / 待办共用） ================= -->
   <div class="mask" id="confirm-mask" hidden>
     <div class="dialog dialog-small" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
       <h3 class="dialog-title" id="confirm-title">删除这个习惯？</h3>
-      <p class="dialog-text">删掉之后，它的完成记录也会一起没了，而且找不回来。</p>
+      <!-- Day 14：加了 id —— 待办删除也走这个弹层，标题和正文由 JS 按类型换（AC-15） -->
+      <p class="dialog-text" id="confirm-text">删掉之后，它的完成记录也会一起没了，而且找不回来。</p>
       <div class="dialog-actions">
         <button type="button" class="btn btn-soft" id="confirm-cancel">取消</button>
         <button type="button" class="btn btn-danger" id="confirm-ok">删除</button>
