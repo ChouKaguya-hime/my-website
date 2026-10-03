@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "version": "2.1",
+  "envId": "{{env.ENV_ID}}",
+  "functionRoot": "./cloudfunctions",
+  "functions": [
+    {
+      "name": "api-health",
+      "description": "健康检查接口（Day 15）",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 5,
+      "memorySize": 256,
+      "installDependency": false,
+      "ignore": [
+        "node_modules",
+        "node_modules/**/*",
+        ".git",
+        "*.md",
+        "*.log"
+      ]
+    }
+  ],
+  "hosting": {
+    "name": "habit-board-web",
+    "root": ".",
+    "framework": "static",
+    "installCommand": "",
+    "buildCommand": "",
+    "outputDir": "dist",
+    "verify": true
+  },
+  "gateway": {
+    "routes": [
+      {
+        "path": "/api-health",
+        "target": "function:api-health",
+        "enableAuth": false
+      }
+    ]
+  }
+}

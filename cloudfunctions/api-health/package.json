@@ -1,0 +1,10 @@
+{
+  "name": "api-health",
+  "version": "1.0.0",
+  "private": true,
+  "description": "习惯规划板 —— 健康检查云函数（Day 15）",
+  "main": "index.js",
+  "engines": {
+    "node": ">=16"
+  }
+}
