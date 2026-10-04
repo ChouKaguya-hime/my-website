@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// 要发到公网的，就这 6 个 —— 三个页面 + 各自配套的样式和脚本
+// 要发到公网的，就这 7 个 —— 两个页面 + 各自配套的样式和脚本 + 共用的云端接入层
 const WHITELIST = [
   'index.html',
   'style.css',
@@ -25,15 +25,30 @@ const WHITELIST = [
   'dashboard.html',
   'dashboard.css',
   'dashboard.js',
+  'cloud.js',   // Day 17 新增：两个页面共用的「读云端」接入层
 ];
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'dist');
 
 function main() {
-  // 1. 先清空 dist/，避免上一次的残留被一起发上去
-  fs.rmSync(OUT_DIR, { recursive: true, force: true });
+  // 1. 先清掉 dist/ 里「这一轮不在白名单里的」文件，避免上一次的残留被一起发上去。
+  //    为什么逐个 unlink，而不是一把 fs.rmSync(dir, {recursive:true})：
+  //      递归删除在很多受管环境里会被安全策略拦下来（Day 17 实测踩到：脚本直接崩，
+  //      dist/ 还留在半路状态）。逐个删文件在哪都能跑，效果一样，也更说得清删了什么。
   fs.mkdirSync(OUT_DIR, { recursive: true });
+  const removed = [];
+  for (const name of fs.readdirSync(OUT_DIR)) {
+    if (WHITELIST.indexOf(name) !== -1) continue;
+    const stale = path.join(OUT_DIR, name);
+    if (fs.lstatSync(stale).isDirectory()) {
+      // dist/ 里本来不该有子目录；真出现了先报出来，别悄悄留着
+      console.warn('dist/ 里有没预料到的子目录，已跳过：' + name);
+      continue;
+    }
+    fs.unlinkSync(stale);
+    removed.push(name);
+  }
 
   // 2. 逐个复制，白名单里少一个文件就报出来（宁可失败，也不要发一个缺文件的站点）
   const missing = [];
@@ -56,6 +71,9 @@ function main() {
 
   // 3. 报告结果（用真实文件大小，方便核对发出去的就是本机这份）
   const total = copied.reduce((sum, f) => sum + f.bytes, 0);
+  if (removed.length > 0) {
+    console.log('已清掉上一轮的残留：' + removed.join('、'));
+  }
   console.log('已打包到 dist/，共 ' + copied.length + ' 个文件、' + total + ' 字节：');
   for (const f of copied) {
     console.log('  ' + f.name.padEnd(18) + f.bytes + ' 字节');

@@ -559,3 +559,31 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
   .topbar { flex-direction: column; align-items: flex-start; gap: 2px; }
 }
+
+/* ================================================================
+   Day 17：数据来源小标（.data-source）
+   ------------------------------------------------------------------
+   页面上的数据现在可能来自两处：云端数据库，或浏览器本机存储。
+   这个小标把「你看到的这一份是从哪来的」直接说清楚 ——
+   排查时不用猜，截图时也一眼看得见。
+   默认 hidden，显隐和文字都由 cloud.js 决定（没读到云端时不会凭空冒出来）。
+   ================================================================ */
+
+.data-source {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: nowrap;
+  background: var(--line-soft);
+  color: #5a5955;              /* 对 #efeeea 约 5.7:1，过 AA */
+  border: 1px solid var(--line);
+}
+
+/* 读到云端时换成绿色系（暖色留给「出错」，这里不是错，不用红） */
+.data-source-cloud {
+  background: var(--done-soft);
+  color: var(--done);          /* 对 #eaf3de 约 5.4:1，过 AA */
+  border-color: #cfe6d8;
+}

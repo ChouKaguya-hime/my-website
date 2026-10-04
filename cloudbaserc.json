@@ -19,6 +19,44 @@
         "*.md",
         "*.log"
       ]
+    },
+    {
+      "name": "api-habits",
+      "description": "读接口 GET /api/habits（Day 17）",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": false,
+      "envVariables": {
+        "PG_API_KEY": "{{env.PG_API_KEY}}"
+      },
+      "ignore": [
+        "node_modules",
+        "node_modules/**/*",
+        ".git",
+        "*.md",
+        "*.log"
+      ]
+    },
+    {
+      "name": "api-todos",
+      "description": "读接口 GET /api/todos（Day 17）",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": false,
+      "envVariables": {
+        "PG_API_KEY": "{{env.PG_API_KEY}}"
+      },
+      "ignore": [
+        "node_modules",
+        "node_modules/**/*",
+        ".git",
+        "*.md",
+        "*.log"
+      ]
     }
   ],
   "hosting": {
@@ -35,6 +73,16 @@
       {
         "path": "/api-health",
         "target": "function:api-health",
+        "enableAuth": false
+      },
+      {
+        "path": "/api/habits",
+        "target": "function:api-habits",
+        "enableAuth": false
+      },
+      {
+        "path": "/api/todos",
+        "target": "function:api-todos",
         "enableAuth": false
       }
     ]

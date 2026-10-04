@@ -15,6 +15,8 @@
       <div class="topbar-left">
         <h1 class="app-title">习惯看板</h1>
         <span class="today-date" id="today-date">—</span>
+        <!-- Day 17：这份数据是从哪来的（本机 / 云端数据库）。字和显隐都由 cloud.js 填 -->
+        <span class="data-source" id="data-source" hidden></span>
       </div>
       <div class="topbar-right">
         <span class="topbar-progress">今天已完成 <strong id="today-count">0 / 0</strong> 件</span>
@@ -324,6 +326,8 @@
   </div>
 
   <!-- 普通 script 引入（T2：不用模块写法，file:// 下模块会被跨域拦） -->
+  <!-- Day 17：cloud.js 是「读云端」的接入层，必须在 dashboard.js 之前引入 -->
+  <script src="cloud.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

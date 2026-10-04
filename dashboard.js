@@ -1406,3 +1406,10 @@ el('hd-delete').addEventListener('click', function () {
 window.addEventListener('hashchange', renderRoute);
 
 renderRoute();
+
+/* Day 17：先用本机那份把页面画出来（保证秒开、断网也不白屏），
+   再去问云端要一份；读到了就换过来重画，读不到就保持本机那份。
+   读云端这件事全都封装在 cloud.js 里，这里只调一行。 */
+if (window.HabitBoardCloud) {
+  window.HabitBoardCloud.sync({ state: state, save: saveData, rerender: renderRoute });
+}

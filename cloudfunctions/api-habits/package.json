@@ -1,0 +1,6 @@
+{
+  "name": "api-habits",
+  "version": "1.0.0",
+  "private": true,
+  "description": "习惯规划板 · 读接口 GET /api/habits（Day 17）。零依赖：只用 Node 18 自带的 fetch。"
+}

@@ -1,6 +1,6 @@
 # my-website
 
-我的第一个 GitHub 项目。目前是 **Day 15** 的状态：第 1 周的 MVP 已经能跑（今日页、习惯详情、待办三块都通了，数据存在浏览器本地）；第 2 周新加了一个**主视图**；主视图的样式在 **Day 9** 按设计规则审过一遍，修掉了文字对比度、标题对齐、勾选圈尺寸等问题；**Day 10** 修掉了空状态那个「加一个示例：早睡」按钮说一套做一套的毛病——它原来一点就倒出 4 个习惯 + 3 条待办，现在只加「早睡」一条、待办一条不加；**Day 11** 给「勾选完成」这个交互补上了三层反馈（动效 / 数值 / 一句话提示条），并把勾选后的「整页重画」换成「只换动过的那一张卡片」，顺带解决了键盘焦点被重画冲掉、连续勾选会断链的问题；**Day 12** 把主视图接上了真实的浏览器本地存储、补上增删，并加了完成状态筛选（详见下面两段）；**Day 13** 把主视图变成**装着三个视图的外壳**，视图之间用地址栏的 `#` 切换（详见下面 Day 13 那一段）；**Day 14** 做了第一次**上手测试**（我代跑一轮 + 一位真人一轮），并按测试结果补了一处漏实现（详见下面 Day 14 那一段）；**Day 15** 第一次**上了公网** —— 云函数 `/api/health` 和前端页面都部署到了腾讯云开发 CloudBase，并产出了接口契约 `api-contract.md`（详见下面 Day 15 那一段）；**Day 16** 给项目建好了**数据库**（CloudBase 上的 PostgreSQL 17）—— 三张表建好、种子数据灌进去、`select` 验过每张表都有数据（详见下面 Day 16 那一段）；同一天还**上线了「成长物」**—— 今日页和看板各长一株跟着打卡长的小苗（详见下面 F6 那一段）。
+我的第一个 GitHub 项目。目前是 **Day 17** 的状态：第 1 周的 MVP 已经能跑（今日页、习惯详情、待办三块都通了，数据存在浏览器本地）；第 2 周新加了一个**主视图**；主视图的样式在 **Day 9** 按设计规则审过一遍，修掉了文字对比度、标题对齐、勾选圈尺寸等问题；**Day 10** 修掉了空状态那个「加一个示例：早睡」按钮说一套做一套的毛病——它原来一点就倒出 4 个习惯 + 3 条待办，现在只加「早睡」一条、待办一条不加；**Day 11** 给「勾选完成」这个交互补上了三层反馈（动效 / 数值 / 一句话提示条），并把勾选后的「整页重画」换成「只换动过的那一张卡片」，顺带解决了键盘焦点被重画冲掉、连续勾选会断链的问题；**Day 12** 把主视图接上了真实的浏览器本地存储、补上增删，并加了完成状态筛选（详见下面两段）；**Day 13** 把主视图变成**装着三个视图的外壳**，视图之间用地址栏的 `#` 切换（详见下面 Day 13 那一段）；**Day 14** 做了第一次**上手测试**（我代跑一轮 + 一位真人一轮），并按测试结果补了一处漏实现（详见下面 Day 14 那一段）；**Day 15** 第一次**上了公网** —— 云函数 `/api/health` 和前端页面都部署到了腾讯云开发 CloudBase，并产出了接口契约 `api-contract.md`（详见下面 Day 15 那一段）；**Day 16** 给项目建好了**数据库**（CloudBase 上的 PostgreSQL 17）—— 三张表建好、种子数据灌进去、`select` 验过每张表都有数据（详见下面 Day 16 那一段）；同一天还**上线了「成长物」**—— 今日页和看板各长一株跟着打卡长的小苗（详见下面 F6 那一段）；**Day 17** 打通了**「数据库 → 接口 → 页面」这条读链路** —— 两个公网读接口 `GET /api/habits`、`GET /api/todos` 上线，**页面上的数据第一次来自云端数据库**，不再只是浏览器本地那一份（详见下面 Day 17 那一段）。
 
 **Day 12** 把主视图从「本地假数据」换成了**真实的浏览器本地存储**，并且补上了增删能力：
 
@@ -103,15 +103,23 @@
 #    不需要把任何密钥交给别人 —— 密钥红线见 AGENTS.md 与训练营附录 M）
 $TCB = "C:\Users\LM\.workbuddy\binaries\node\workspace\node_modules\@cloudbase\cli\bin\cloudbase"
 
+# 0.5) Day 17 起：云函数要读数据库，得先把「服务端 API Key」读进环境变量。
+#      它躺在被 gitignore 的 .env 里（PG_API_KEY=...），cloudbaserc.json 用 {{env.PG_API_KEY}} 引用它。
+Get-Content .env | ForEach-Object {
+  if ($_ -match '^\s*([A-Z_]+)=(.*)$') { Set-Item -Path "env:$($matches[1])" -Value $matches[2] }
+}
+
 # 1) 部署云函数（cloudbaserc.json 里有同名函数时会问是否覆盖，答 y）
-& $TCB fn deploy api-health -e <环境ID>
+& $TCB fn deploy api-health -e $env:ENV_ID
+& $TCB fn deploy api-habits -e $env:ENV_ID      # Day 17 新增
+& $TCB fn deploy api-todos  -e $env:ENV_ID      # Day 17 新增
 
 # 2) 建 / 更新公网路由（规则写在 cloudbaserc.json 的 gateway 里，不写 domain 就用环境默认域名）
-& $TCB deploy --only gateway -e <环境ID>
+& $TCB deploy --only gateway -e $env:ENV_ID
 
-# 3) 打包前端（只挑那 6 个页面文件）再上传
+# 3) 打包前端（只挑那 7 个页面文件）再上传
 node scripts\stage-static.js
-& $TCB hosting deploy dist -e <环境ID> --verify
+& $TCB hosting deploy dist -e $env:ENV_ID --verify
 ```
 
 环境 ID 记在被 gitignore 的 `.env` 里（`ENV_ID=`），不进仓库。
@@ -149,6 +157,9 @@ $E = "<环境ID>"
 # 灌种子（可重复执行）
 & $TCB db execute -e $E --sql "$(Get-Content db/seed.sql -Raw)"
 
+# 当日数据同步（Day 17 新增，可重复执行 —— 每天跑一次都行）
+& $TCB db execute -e $E --sql "$(Get-Content db/sync.sql -Raw)"
+
 # 验证：三张表各有多少行
 & $TCB db execute -e $E --sql "SELECT 'habits' AS tbl, count(*) AS rows FROM habits UNION ALL SELECT 'habit_records', count(*) FROM habit_records UNION ALL SELECT 'todos', count(*) FROM todos"
 ```
@@ -174,6 +185,85 @@ $E = "<环境ID>"
 - 来龙去脉和四类机制对比在 `ideas/growth-companion.md`；
   最初用来试手感的独立原型留在 `prototype/growth-demo.html`
 
+**Day 17** 打通了**「数据库 → 接口 → 页面」这条读链路** —— 页面上的数据第一次来自云端数据库：
+
+前面两天的账是这样的：Day 15 证明了「公网能打到我的云函数」，Day 16 把数据落进了真表。
+但这两件事**还没连起来** —— 库里有数据、接口只有一个不读库的健康检查、页面上显示的其实还是浏览器本地那份。
+Day 17 就是把中间那段接上。
+
+- 新增 **`cloudfunctions/api-habits/`** 和 **`cloudfunctions/api-todos/`** —— 两个公网读接口：
+
+  | 接口 | 读什么 | 公开地址 |
+  | --- | --- | --- |
+  | `GET /api/habits` | `habits` + `habit_records` 两张表，聚合成习惯列表 | `…app.tcloudbase.com/api/habits` |
+  | `GET /api/todos` | `todos` 一张表 | `…app.tcloudbase.com/api/todos` |
+
+  **零依赖**（`installDependency: false`，没有 `node_modules`）：只用 Node 18 自带的 `fetch` 去问
+  CloudBase 的 PostgreSQL HTTP API（详见下面第 3 点）。
+
+- ⭐ **今天要回答的那个问题**：「接口返回的数据里，哪一项和你建的表对不上？」
+
+  **答：两处对不上，都不是靠「看」发现的，是写接口时被数据逼出来的**（完整版在 `api-contract.md` 第 3.1 节）：
+
+  | | 表里是什么 | 接口要返回什么 | 谁来做这个翻译 |
+  | --- | --- | --- | --- |
+  | **形状** | `habit_records` 表：**一行 = 一次打卡** | `doneDates` 要一个**数组** | 读出来后在云函数里聚合成数组 |
+  | **命名** | `freq_type` / `freq_count` / `created_at` / `todo_date` | `freqType` / `freqCount` / `createdAt` / `date` | 云函数里逐字段改名 |
+
+  关系型**一个格子只能放一个值**，所以「哪天完成」在库里必然是很多行；
+  而前端从 Day 8 起用的就是那个数组 —— 这个落差必须有人补。
+  **最硬的发现方法是第三条**：不猜，直接问库要一行，看它到底回什么：
+
+  ```bash
+  curl -s ".../v1/rdb/rest/habits?select=*&limit=1" -H "Authorization: Bearer <服务端密钥>"
+  # → [{"id":"h_seed_water","name":"每天喝 8 杯水","freq_type":"daily","freq_count":7,"created_at":"2026-08-25"}]
+  #    freq_type 前端不认；doneDates 压根没有 —— 一眼就露馅
+  ```
+
+- **后端怎么读到数据库的：三条路实测只走通一条**（`api-contract.md` 第 3.6 节）：
+
+  | 走法 | 本环境能不能用 |
+  | --- | --- |
+  | 前端 SDK 直连 | 能，但**必须在库里配 RLS 策略**；本期只有一个用户，不值当 |
+  | **HTTP API（PostgREST）** | ✅ **今天用的就是这条** —— 不需要 VPC、不需要配 RLS |
+  | PostgreSQL 协议直连（`pg` 包） | ❌ **体验版走不通**：内网互联是标准版功能，公网直连开关也开不了 |
+
+  **密钥红线守住了**：用 `tcb env apikey create` 建了一个**服务端 API Key**，
+  它只写进**云函数的环境变量**（`cloudbaserc.json` 里 `{{env.PG_API_KEY}}`）和本地被 gitignore 的 `.env`；
+  **不进代码、不进 Git、不进聊天，前端也拿不到**（页面只调自己那两个云函数）。
+
+- 新增 **`cloud.js`** —— 两个页面共用的「读云端」接入层（仓库根目录）。
+  页面**先用本机那份画一遍再问云端**：读到了就换成库里的重画，读不到（断网 / 接口挂 / 还没部署）
+  就保持本机那份 —— **绝不白屏、绝不报错**。两个页面各自只加了**一行**调用。
+  契约里那句「接口地址和读法只出现在一个地方」，今天真的落到一个文件上了。
+- 顶栏加了一个**「云端数据库 / 本机数据」小标**，直接告诉看页面的人此刻用的是哪一份。
+- 新增 **`db/sync.sql`** —— **当日数据同步**（清单里的「同步任务」）。
+  和 Day 16 的 `seed.sql` 分工不同：`seed.sql` 是建库那天一次性造数据，
+  `sync.sql` 是**可以每天跑、同一天跑几次都行**的刷新脚本 ——
+  把种子的待办日期对齐到「今天」、把打卡记录整体平移到以今天为最新
+  （同一天重复跑 `Affected rows: 0`，实测幂等）。
+  **它刻意不伪造今天的打卡** —— 「今天完成了几个」该是人真勾出来的。
+- 今天起打开**跨域（CORS）**（页面要 fetch 接口，不配会被浏览器拦）。代价要认：
+  本期没有登录，两个读接口是**公开可读**的 —— 已写进 `api-contract.md` 第 5 节「明确不做」，不是忘了。
+
+**验证证据（都能重跑，不是「应该没问题」）**：
+
+| 验什么 | 结果 |
+| --- | --- |
+| 两个云函数本地自检（真库 + 真密钥，27 条断言） | **27 通过 / 0 失败** |
+| `GET /api/habits` 公网 | `200`，`ok:true`，`count:6`，字段全是 camelCase，**三个 snake_case 名字搜不到** |
+| `GET /api/todos` 公网 | `200`，`count:6`，`date` 改名生效、`done` 是真布尔 |
+| 查询参数（余力加练） | `?limit=2` → 2 条；`?date=2026-10-04` → 5 条；`?date=2026-02-30` → 不报错，降级成不筛 |
+| 方法用错 | 两个接口 `POST` 都是 `405` + `{ok:false,error:"method_not_allowed"}` |
+| 跨域头 | `access-control-allow-origin: *` 在 |
+| **改一行数据，接口跟着变** | 在库里 `UPDATE` 一条待办 → **不重新部署**、直接再请求接口，内容跟着变了（改完也验了改回去） |
+| 静态站 | 7 个页面文件公网 `200`；`README.md` / `PRD.md` / `api-contract.md` / `db/seed.sql` / `.env` 全 `404` |
+| 同步脚本幂等 | 连跑两次都是 `Affected rows: 0`；行数稳定 6 / 17 / 6 |
+
+> ⚠️ **一个刻意的临时状态**：今天只接了「读」，**「写」还在浏览器本地**（Day 18 接）。
+> 所以现在在页面上新增 / 勾选 / 删除，**刷新之后会被数据库那一份盖掉** ——
+> 这是先接读、再接写的顺序造成的，不是 bug。
+
 ## 当前状态
 
 | 文件 | 作用 |
@@ -188,18 +278,22 @@ $E = "<环境ID>"
 | `skills/filter-check/` | 项目内的**技能包**（Day 12 新增）：筛选交互的检查规则（`SKILL.md`）+ 可执行检查脚本（`run-check.js`）+ 调用记录（`usage-log.md`） |
 | `user-test/` | **上手测试**（Day 14 新增）：`CHECKLIST.md` 是给第一次用的人照着做的测试清单；`record-*.md` 是每一轮的测试记录（`2026-09-30` 是我代跑的、`2026-10-02` 是真人那一轮） |
 | `cloudfunctions/api-health/` | **云函数**（Day 15 新增）：第一个跑在云上的东西，健康检查接口 `/api/health`。返回体带 `envId` / `version` / `checkedAt`，用来确认「公网地址返回的是我这份」 |
-| `api-contract.md` | **接口契约**（Day 15 新增，v1.0）：前端与后端之间写死的账 —— 请求 / 响应字段、状态码、命名与时间格式约定、各阶段不做什么 |
-| `cloudbaserc.json` | **部署配置**（Day 15 新增）：云函数 + 静态托管 + 网关路由的声明；环境 ID 走 `.env`，不写死在文件里 |
-| `scripts/stage-static.js` | **静态站打包**（Day 15 新增，脚本不进公网）：按白名单把 6 个页面文件复制到 `dist/`，避免把内部文档发到公网 |
+| `cloudfunctions/api-habits/` | **云函数**（Day 17 新增）：读接口 `GET /api/habits`。把 `habits` + `habit_records` 两张表整理成前端要的形状（改名 + 聚合成 `doneDates` 数组） |
+| `cloudfunctions/api-todos/` | **云函数**（Day 17 新增）：读接口 `GET /api/todos`。支持 `?date=` / `?limit=` |
+| `cloud.js` | **云端读入层**（Day 17 新增）：两个页面共用的「读云端」逻辑 —— 接口地址只在这一处；读不到就回落到本机那份 |
+| `api-contract.md` | **接口契约**（Day 15 新增，**v1.1 于 Day 17 扩写**）：前端与后端之间写死的账 —— 请求 / 响应字段、状态码、命名与时间格式约定、各阶段不做什么。第 3 节是两个读接口的完整定义 |
+| `cloudbaserc.json` | **部署配置**（Day 15 新增）：云函数 + 静态托管 + 网关路由的声明；环境 ID 和数据库密钥都走 `.env`，不写死在文件里 |
+| `scripts/stage-static.js` | **静态站打包**（Day 15 新增，脚本不进公网）：按白名单把 **7 个**页面文件复制到 `dist/`，避免把内部文档发到公网 |
 | `db/schema.sql` | **建表脚本**（Day 16 新增）：三张表 `habits` / `habit_records` / `todos`，含字段注释与外键约束，可重复执行 |
 | `db/seed.sql` | **种子数据**（Day 16 新增）：6 习惯 + 17 打卡 + 6 待办；`ON CONFLICT DO NOTHING` 保证重复执行不报错 |
+| `db/sync.sql` | **当日数据同步**（Day 17 新增）：可每天重复跑 —— 待办日期对齐到今天、打卡记录平移到以今天为最新；**不伪造今天的打卡** |
 | `ideas/growth-companion.md` | **提案**（Day 16）：成长物（小苗）—— 为什么做、借鉴了谁、四类机制对比、过审理由、边界红线。**已过审并实施**（见 F6） |
 | `prototype/growth-demo.html` | **可玩原型**（Day 16）：独立单文件、双击可点、零依赖。最初用来试手感，**正式实现已接进今日页和看板**，它留作参考 |
 | `research.md` | 需求研究（Day 3）：3 个类似产品比较 + 本期不做清单 |
 | `PRD.md` | 产品需求文档（Day 4，v1.2 于 Day 12 追加 F5「主视图」+「筛选」与 AC-14/15/16）：做什么 / 不做什么 / 怎么算做完了 |
 | `TECH_DESIGN.md` | 技术方案（Day 5）：技术路线 + 数据流图 + 实现期硬约束（T1–T8） |
 | `.gitignore` | 忽略规则，确保 `.env` 等本地文件不会被上传 |
-| `.env` | 本地环境变量（**已被忽略，不在仓库里**），Day 23 接数据库时启用 |
+| `.env` | 本地环境变量（**已被忽略，不在仓库里**）：Day 15 放环境 ID，Day 17 起多了一个 `PG_API_KEY`（数据库服务端 API Key） |
 
 ## 怎么跑起来
 
@@ -255,20 +349,38 @@ C:\Users\LM\.workbuddy\binaries\python\versions\3.13.12\python.exe -m http.serve
 用 `http://localhost:8000/index.html` 加的数据，双击打开 `dashboard.html` 是看不到的 ——
 浏览器的本地存储是**按「来源」分开存的**，`localhost:8000` 和 `file://` 在浏览器眼里是两个不同的地方。
 
-### 方式 D · 公网地址（Day 15 新增，手机也能开）
+### 方式 D · 公网地址（Day 15 新增，手机也能开；Day 17 起页面读的是云端数据库）
 
 - 前端页面：**https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/**
 - 健康检查接口：**https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com/api-health**
+- 读接口（Day 17）：
+  - **…/api/habits**
+  - **…/api/todos**（也可以 `…/api/todos?date=2026-10-04`）
 
 ⚠️ **第一次打开会先看到一张腾讯云的「页面访问提示」**（因为是默认测试域名），
 点一下「确定访问」就进去了 —— 这不是页面坏了，是平台对默认域名的限制。
 
-⚠️ 公网上的数据仍然存在**你这台设备的浏览器里**（还没接后端），所以手机上打开是空的，
-在你电脑上加的习惯也不会跑到手机上去。共享数据是后面几天的事。
+✅ **Day 17 起**：打开页面时顶栏会显示一个**「云端数据库」**小标 ——
+说明这一份数据是从 CloudBase 的 PostgreSQL 里读出来的（经 `/api/habits` 和 `/api/todos`）。
+如果显示的是**「本机数据」**，说明没读到接口，页面回落到浏览器本地那份了。
+
+⚠️ **但「写」还是本地的**（Day 18 接）：现在在页面上加习惯 / 勾待办 / 删东西，
+**刷新之后会被数据库那一份盖掉**。想看到自己加的，Day 18 收工之后再来。
+另外，数据现在是**公开可读**的（本期没有登录），别往里面写私事。
 
 ## 数据存在哪
 
-存在浏览器自带的本地存储里，键名是 `habit-board/v1`（带版本号，以后字段变了能区分新旧数据）。
+**两处都有，各自管一半**（这周正在从「只有本机」搬到「云端为准」）：
+
+| | 本机（浏览器本地存储，键名 `habit-board/v1`） | 云端（CloudBase PostgreSQL） |
+| --- | --- | --- |
+| **读** | 页面打开时先用它画一遍（保证秒开、断网也能看） | Day 17 起：**读到了就换成库里的那份** |
+| **写** | Day 17 为止，**所有改动都写这里** | ❌ 还没接（Day 18） |
+
+**为什么读要「先本机、再云端」**：接口挂了、断网了、还没部署 —— 页面必须照常打得开。
+这是 Day 1 就定的底线。右上角那个小标会告诉你此刻用的是哪一份。
+
+---
 
 **今日页和主视图读写的是同一个键** —— 所以两个视图共用一份数据，
 在任意一页加的习惯和待办，另一页刷新后都在。**不存在「看板的数据」和「今日页的数据」两份。**

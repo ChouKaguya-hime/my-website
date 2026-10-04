@@ -967,3 +967,29 @@ button:focus-visible {
   /* 动效关掉了，提示条更要留着 —— 这种情况下它是唯一说清「刚才干了什么」的东西 */
   .toast { transition: none; }
 }
+
+/* ================================================================
+   Day 17：数据来源小标（.data-source）
+   ------------------------------------------------------------------
+   和 style.css 里那一份是同一件事（两个页面共用一套写法，不为这一行新建公共文件）。
+   默认 hidden，显隐和文字都由 cloud.js 决定。
+   ================================================================ */
+
+.data-source {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: nowrap;
+  background: var(--line-soft);
+  color: #5a5955;              /* 对 #efeeea 约 5.7:1，过 AA */
+  border: 1px solid var(--line);
+}
+
+/* 读到云端时换成绿色系（暖色留给「出错」，这里不是错，不用红） */
+.data-source-cloud {
+  background: var(--done-soft);
+  color: var(--done);          /* 对 #eaf3de 约 5.4:1，过 AA */
+  border-color: #cfe6d8;
+}
