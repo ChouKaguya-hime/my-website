@@ -51,6 +51,45 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
   gap: 18px;
 }
 
+/* ---------------------------------------------------------------- 成长物（F6） */
+
+/*
+ * 和今日页长的是同一株小苗（PRD 第 4 节 F6）。
+ * 长出来的用绿色，还没长到的用中性灰 —— 灰色是「还能长到这里」，不是「缺了什么」，
+ * 不用红色、不加警示（设计原则 1）。
+ */
+.growth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.growth-leaves { display: flex; align-items: center; gap: 5px; flex: none; }
+
+.growth-leaf {
+  width: 15px;
+  height: 11px;
+  /* 经典 CSS 叶形（两个对角尖），比椭圆更像叶片 */
+  border-radius: 100% 0 100% 0;
+  background: var(--cell-off);
+  flex: none;
+}
+.growth-leaf.on { background: var(--done); }
+.growth-leaf.on:nth-child(odd) { transform: rotate(-13deg); }
+.growth-leaf.on:nth-child(even) { transform: rotate(13deg); }
+
+.growth-bloom {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.growth-shelf { display: flex; align-items: center; gap: 4px; color: var(--faint); font-size: 12px; }
+
 /* ---------------------------------------------------------------- 顶栏 */
 
 .topbar {

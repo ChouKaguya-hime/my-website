@@ -55,14 +55,16 @@ var state = { habits: [], todos: [] };
 function loadData() {
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { habits: [], todos: [] };
+    if (!raw) return { habits: [], todos: [], growth: null };
 
     var obj = JSON.parse(raw);
     if (!obj || typeof obj !== 'object') return null;
 
     return {
       habits: Array.isArray(obj.habits) ? obj.habits : [],
-      todos: Array.isArray(obj.todos) ? obj.todos : []
+      todos: Array.isArray(obj.todos) ? obj.todos : [],
+      /* 成长物（F6）：老数据里没这个字段 → 给 null，由 growthState() 补默认值 */
+      growth: (obj.growth && typeof obj.growth === 'object') ? obj.growth : null
     };
   } catch (e) {
     return null;                 /* 隐私模式禁止写入 / 内容坏了 */
@@ -288,6 +290,90 @@ function setFilter(name) {
   renderHabits();
   renderTodos();
   renderHints();
+}
+
+/* ==================== 三·六、成长物（F6，PRD v1.3） ==================== */
+
+/*
+ * 和今日页长的是**同一株**小苗 —— 同一个存储键里的同一个 growth 字段。
+ * 规则（PRD 第 4 节 F6）：每完成一个习惯长一格，当天最多一格；攒满 7 格开一朵花，
+ * 花进「花架」只增不减；一天没喂不枯、不掉、不清空（设计原则 1）。
+ */
+
+var GROWTH_FULL = 7;
+var GROWTH_COLORS = ['#d4537e', '#ef9f27', '#7f77dd', '#d85a30'];
+
+function growthState() {
+  if (!state.growth || typeof state.growth !== 'object') {
+    state.growth = { progress: 0, fedDate: null, flowers: [] };
+  }
+  var g = state.growth;
+  if (typeof g.progress !== 'number' || g.progress < 0) g.progress = 0;
+  if (g.progress > GROWTH_FULL) g.progress = GROWTH_FULL;
+  if (typeof g.fedDate !== 'string') g.fedDate = null;
+  if (!Array.isArray(g.flowers)) g.flowers = [];
+  return g;
+}
+
+/** 完成了一个习惯 → 喂一口（当天只长一格；攒满 7 格开一朵花） */
+function feedGrowth() {
+  var g = growthState();
+  var t = todayStr();
+  if (g.fedDate === t) return;
+  g.progress += 1;
+  g.fedDate = t;
+  if (g.progress >= GROWTH_FULL) {
+    g.flowers.push(GROWTH_COLORS[Math.floor(Math.random() * GROWTH_COLORS.length)]);
+    g.progress = 0;
+  }
+}
+
+function renderGrowth() {
+  var bar = el('growth');
+  if (!bar) return;
+
+  /* 一个习惯都还没有就不占地方 */
+  if (state.habits.length === 0) { bar.hidden = true; return; }
+  bar.hidden = false;
+
+  var g = growthState();
+  var i;
+
+  var leaves = el('growth-leaves');
+  leaves.innerHTML = '';
+  for (i = 1; i <= GROWTH_FULL; i++) {
+    var leaf = document.createElement('i');
+    leaf.className = 'growth-leaf' + (i <= g.progress ? ' on' : '');
+    leaves.appendChild(leaf);
+  }
+
+  var text = el('growth-text');
+  if (g.progress === 0) {
+    text.textContent = g.flowers.length > 0
+      ? '新的一轮 —— 它又从头冒出来了'
+      : '还没喂过 —— 它在土里等着';
+  } else {
+    text.textContent = '这轮喂了 ' + g.progress + ' 口，长到第 ' + g.progress + ' 格';
+  }
+
+  var shelf = el('growth-shelf');
+  shelf.innerHTML = '';
+  if (g.flowers.length === 0) {
+    var none = document.createElement('span');
+    none.textContent = '花架还是空的';
+    shelf.appendChild(none);
+  } else {
+    var label = document.createElement('span');
+    label.textContent = '花架 ' + g.flowers.length + ' 朵';
+    shelf.appendChild(label);
+    var showN = Math.min(g.flowers.length, 8);
+    for (i = 0; i < showN; i++) {
+      var pip = document.createElement('i');
+      pip.className = 'growth-bloom';
+      pip.style.background = g.flowers[i];
+      shelf.appendChild(pip);
+    }
+  }
 }
 
 /* ==================== 四、状态机 ==================== */
@@ -536,6 +622,9 @@ function renderHints() {
       ? ''
       : '筛出 ' + visibleHabits().length + ' 个习惯 · ' + visibleTodos().length + ' 条待办';
   }
+
+  /* F6：成长物也在这里刷新 —— 所有调 renderHints 的地方（含切视图）都会跟着更新 */
+  renderGrowth();
 }
 
 function renderAll() {
@@ -769,6 +858,7 @@ function toggleHabitToday(id) {
   if (i === -1) {
     h.doneDates.push(t);
     nowDone = true;
+    feedGrowth();          // F6：变成「完成」才喂一口（取消勾不吐回去）
   } else {
     h.doneDates.splice(i, 1);
     nowDone = false;

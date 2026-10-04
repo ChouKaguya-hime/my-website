@@ -18,7 +18,7 @@ var STORAGE_KEY = 'habit-board/v1';
  * 任何异常（没存过 / 内容坏了 / 隐私模式禁止）都退回空数据，绝不让页面崩掉。
  */
 function loadData() {
-  var empty = { habits: [], todos: [] };
+  var empty = { habits: [], todos: [], growth: null };
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return empty;
@@ -26,7 +26,9 @@ function loadData() {
     if (!obj || typeof obj !== 'object') return empty;
     return {
       habits: Array.isArray(obj.habits) ? obj.habits : [],
-      todos: Array.isArray(obj.todos) ? obj.todos : []
+      todos: Array.isArray(obj.todos) ? obj.todos : [],
+      /* 成长物（F6）：老数据里没这个字段 → 给 null，由 growthState() 补默认值 */
+      growth: (obj.growth && typeof obj.growth === 'object') ? obj.growth : null
     };
   } catch (e) {
     return empty;
@@ -142,6 +144,98 @@ function habitsToday() {
 function todosToday() {
   var t = todayStr();
   return state.todos.filter(function (x) { return x.date === t; });
+}
+
+/* ======================= 三·五、成长物（F6，PRD v1.3） ======================= */
+
+/*
+ * 一株跟着打卡长的小苗。
+ * 规则（PRD 第 4 节 F6）：每完成一个习惯长一格，**当天最多一格**；
+ * 攒满 7 格开一朵花，花进「花架」只增不减；一天没喂不枯、不掉、不清空（设计原则 1）。
+ * 数据并进同一个存储键，**不新增存储键**。
+ */
+
+var GROWTH_FULL = 7;
+var GROWTH_COLORS = ['#d4537e', '#ef9f27', '#7f77dd', '#d85a30'];
+
+/** 取成长物状态；老数据没这个字段就补一份默认的（不单独写盘，下次 commit 一起存） */
+function growthState() {
+  if (!state.growth || typeof state.growth !== 'object') {
+    state.growth = { progress: 0, fedDate: null, flowers: [] };
+  }
+  var g = state.growth;
+  if (typeof g.progress !== 'number' || g.progress < 0) g.progress = 0;
+  if (g.progress > GROWTH_FULL) g.progress = GROWTH_FULL;
+  if (typeof g.fedDate !== 'string') g.fedDate = null;
+  if (!Array.isArray(g.flowers)) g.flowers = [];
+  return g;
+}
+
+/**
+ * 完成了一个习惯 → 喂一口。
+ * 当天只长一格；攒满 7 格就开一朵花（4 种颜色里随机），然后下一格从头长。
+ */
+function feedGrowth() {
+  var g = growthState();
+  var t = todayStr();
+  if (g.fedDate === t) return;          // 今天已经长过了 —— 一天最多一格
+  g.progress += 1;
+  g.fedDate = t;
+  if (g.progress >= GROWTH_FULL) {
+    g.flowers.push(GROWTH_COLORS[Math.floor(Math.random() * GROWTH_COLORS.length)]);
+    g.progress = 0;
+  }
+}
+
+function renderGrowth() {
+  var bar = el('growth');
+  if (!bar) return;
+
+  /* 一个习惯都还没有时不占地方 —— 那时页面已经在引导「先加一个试试」了 */
+  if (state.habits.length === 0) { bar.hidden = true; return; }
+  bar.hidden = false;
+
+  var g = growthState();
+  var i;
+
+  /* 7 片叶子：长出来的绿、还没长到的灰 */
+  var leaves = el('growth-leaves');
+  leaves.innerHTML = '';
+  for (i = 1; i <= GROWTH_FULL; i++) {
+    var leaf = document.createElement('i');
+    leaf.className = 'growth-leaf' + (i <= g.progress ? ' on' : '');
+    leaves.appendChild(leaf);
+  }
+
+  /* 一句话 */
+  var text = el('growth-text');
+  if (g.progress === 0) {
+    text.textContent = g.flowers.length > 0
+      ? '新的一轮 —— 它又从头冒出来了'
+      : '还没喂过 —— 它在土里等着';
+  } else {
+    text.textContent = '这轮喂了 ' + g.progress + ' 口，长到第 ' + g.progress + ' 格';
+  }
+
+  /* 花架：只增不减 */
+  var shelf = el('growth-shelf');
+  shelf.innerHTML = '';
+  if (g.flowers.length === 0) {
+    var none = document.createElement('span');
+    none.textContent = '花架还是空的';
+    shelf.appendChild(none);
+  } else {
+    var label = document.createElement('span');
+    label.textContent = '花架 ' + g.flowers.length + ' 朵';
+    shelf.appendChild(label);
+    var showN = Math.min(g.flowers.length, 8);
+    for (i = 0; i < showN; i++) {
+      var pip = document.createElement('i');
+      pip.className = 'growth-bloom';
+      pip.style.background = g.flowers[i];
+      shelf.appendChild(pip);
+    }
+  }
 }
 
 /* ============================ 四、渲染 ============================ */
@@ -270,6 +364,7 @@ function renderTodos() {
 
 function render() {
   renderTodayBar();
+  renderGrowth();          /* F6：成长物 */
   renderHabits();
   renderTodos();
 }
@@ -298,8 +393,12 @@ function toggleHabitToday(id) {
   if (!Array.isArray(h.doneDates)) h.doneDates = [];
   var t = todayStr();
   var i = h.doneDates.indexOf(t);
-  if (i === -1) h.doneDates.push(t);
-  else h.doneDates.splice(i, 1);
+  if (i === -1) {
+    h.doneDates.push(t);
+    feedGrowth();          // F6：变成「完成」才喂一口（取消勾不吐回去）
+  } else {
+    h.doneDates.splice(i, 1);
+  }
   commit();
 }
 
@@ -465,8 +564,12 @@ function toggleHabitDate(id, dateStr) {
   if (!h) return;
   if (!Array.isArray(h.doneDates)) h.doneDates = [];
   var i = h.doneDates.indexOf(dateStr);
-  if (i === -1) h.doneDates.push(dateStr);
-  else h.doneDates.splice(i, 1);
+  if (i === -1) {
+    h.doneDates.push(dateStr);
+    if (dateStr === todayStr()) feedGrowth();   // F6：补勾的是「今天」才算喂了一口
+  } else {
+    h.doneDates.splice(i, 1);
+  }
 
   commit();          // 今日页跟着变
   renderDetail();    // 详情自己也要立刻更新
