@@ -1,10 +1,14 @@
 -- =============================================================================
--- db/schema.sql ｜ 习惯规划板 · 数据库表结构（Day 16 产出）
+-- db/schema.sql ｜ 习惯规划板 · 数据库表结构（Day 16 产出，Day 18 追加一条唯一索引）
 -- =============================================================================
 -- 目标环境：CloudBase PostgreSQL（实测 PostgreSQL 17.11）
 -- 上游依据：PRD.md 第 6.1 节（存什么，字段不增不减）、api-contract.md 第 3.2 节（JSON 字段用小驼峰）
--- 执行方式：tcb db execute -e <envId> --role postgres --sql "<本文件内容>"
--- 幂等性：全部用 CREATE TABLE IF NOT EXISTS，重复执行不报错、不改动已有表。
+-- 执行方式：tcb db execute -e <envId> --sql "$(cat db/schema.sql)"
+-- 幂等性：全部用 CREATE TABLE / CREATE INDEX IF NOT EXISTS，重复执行不报错、不改动已有表。
+--
+-- 【Day 18 改了什么】只在 habits 上加了 ux_habits_name 这一条唯一索引（同名的习惯只留一条），
+--   三张表的结构、列、其余约束一个字没动。原因见那条索引上方的注释。
+
 --
 -- ── 今天要回答的那个问题 ──────────────────────────────────────────────────────
 --   「你的两张表分别存什么？它们靠哪个字段关联？」
@@ -30,6 +34,14 @@ CREATE TABLE IF NOT EXISTS habits (
   CONSTRAINT habits_freq_type_chk CHECK (freq_type IN ('daily', 'weekly')),
   CONSTRAINT habits_freq_count_chk CHECK (freq_count BETWEEN 1 AND 7)
 );
+
+-- ★ Day 18 追加：同一个名字的习惯只能有一条 ★
+-- 为什么要有它（而不是只在云函数里「先查一遍再插」）：
+--   云函数里的查重是「先看一眼、再写」——两个请求几乎同时到达时，
+--   它们会同时看到「这个名字还没人用」，然后各插一条，查重就漏了（双击提交 / 网络重试正是这种情况）。
+--   唯一索引由数据库自己保证：第二条不管怎么并发都插不进去。
+--   → 两层分工：应用层负责给「已经有一个叫「X」的习惯了」这句人话；数据库层负责让重复真的进不来。
+CREATE UNIQUE INDEX IF NOT EXISTS ux_habits_name ON habits (name);
 
 COMMENT ON TABLE  habits             IS '习惯定义表（PRD 6.1 习惯 habit）——只存习惯本身，不含完成记录';
 COMMENT ON COLUMN habits.id          IS '习惯唯一标识，前端生成，形如 h_ + 时间戳36进制 + 随机串';

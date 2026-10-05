@@ -22,7 +22,7 @@
     },
     {
       "name": "api-habits",
-      "description": "读接口 GET /api/habits（Day 17）",
+      "description": "习惯接口：GET 读（Day 17）+ POST 新建（Day 18）",
       "runtime": "Nodejs18.15",
       "handler": "index.main",
       "timeout": 10,
