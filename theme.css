@@ -1,0 +1,240 @@
+/* ==========================================================================
+   theme.css —— 主题层：背景插画 + 暖色调 + 页面音乐（Day 18 加餐）
+   --------------------------------------------------------------------------
+   为什么单独一个文件，而不是改进 style.css / dashboard.css：
+     两个页面各有一套 CSS，但「背景 / 音乐 / 配色」是**两个页面共用的一层**。
+     和 cloud.js 一个道理 —— 共用的东西放一个地方，以后调色只动这一处，
+     不会出现「今日页调了一半、看板还是旧配色」。
+
+   ⚠️ 加载顺序：必须排在 style.css / dashboard.css **后面** —— 它靠覆盖 CSS 变量生效。
+
+   为什么加本地素材不算违反 T1 / AC-10：
+     T1 禁的是「从网上加载字体、图标库、框架」，AC-10 说的是「除页面自身文件外
+     没有任何外部网络请求」。背景图和音乐都是**随页面一起发出去的本地文件**，
+     同源、不联网 —— 它们算「页面自身文件」的一部分。
+
+   配色取自那张插画：落日的暖橙、车厢的木质棕、暮色里的灰紫。
+   ========================================================================== */
+
+/* ------------------------------------------------- 一、暖色主题（覆盖变量） */
+
+:root {
+  --bg: #f7f1e9;                      /* 图没加载出来时的兜底色（暖米白） */
+  --card: rgba(255, 253, 250, 0.92);  /* 小控件（按钮 / 筛选片）的底：不模糊，所以更实一点 */
+
+  --line: rgba(124, 97, 71, 0.20);
+  --line-soft: rgba(124, 97, 71, 0.11);
+
+  --text: #2b241c;
+  --muted: #6a5d50;
+  /* 顺手修了个老问题：原来 #a8a7a2 压在卡片上只有约 2.2:1，算不上 AA；
+     现在这个对玻璃面约 4.6:1，同样还是「淡」的观感 */
+  --faint: #675c52;
+
+  --accent: #8f4315;                  /* 暖橙（原先是蓝 #185fa5），对玻璃面约 5.2:1 */
+  --accent-soft: #fbeee3;
+
+  --done: #4a6b1e;
+  --done-soft: #eef3e2;
+
+  --cell-off: #e9e1d6;
+  --cell-future: #f4eee6;
+
+  --danger: #9c2b23;
+  --danger-soft: #fbeae7;
+
+  --skeleton: #ece4d9;
+
+  --radius: 14px;
+
+  /* 两个阴影：纯黑阴影压在暖底上会发灰，所以用暖棕 */
+  --shadow-sm: 0 1px 2px rgba(92, 63, 38, 0.07);
+  --shadow-md: 0 8px 22px -10px rgba(92, 63, 38, 0.26), 0 1px 3px rgba(92, 63, 38, 0.06);
+
+  /* 玻璃面：大块内容用 glass-surface，顶栏那两片小底用 glass-bar（更实一点） */
+  --glass-surface: rgba(255, 253, 250, 0.85);
+  --glass-bar: rgba(255, 252, 247, 0.86);
+  --glass-line: rgba(255, 255, 255, 0.55);
+}
+
+/* ------------------------------------------------- 二、背景层（插画 + 薄雾） */
+
+/*
+ * 两层固定在窗口上的伪元素：::before 是画，::after 是暖色薄雾。
+ *
+ * 为什么不用 body 的 background-image：伪元素能单独控层级，也不用碰
+ * background-attachment（那个在移动端不可靠）。
+ *
+ * ⚠️ 千万别给 html 加 background —— html 一有背景，body 的背景就不再往画布上传播，
+ *    body 会把它当成自己的**元素背景**画出来，正好压在负 z-index 的伪元素上面，
+ *    画就被盖住了。这里保持 body 有背景、html 没有，才能让伪元素露出来。
+ */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;   /* 绝不挡住下面的点击 */
+}
+
+body::before {
+  z-index: -2;
+  background-image: url("assets/bg-starry-sea.jpg");
+  background-size: cover;
+  background-position: center 34%;   /* 让车窗里那三个人落在上半屏 */
+  background-repeat: no-repeat;
+  background-color: var(--bg);
+}
+
+/*
+ * 薄雾：只做一点点暖色压边，**不是**用来压暗画的。
+ * 这一版刻意做得很淡 —— 可读性不靠它：文字都在自己的「小玻璃片 / 卡片」上，
+ * 那两样各自把对比度兜住了（见第三、四节）。薄雾再压一遍，只会把画洗成一片灰。
+ */
+body::after {
+  z-index: -1;
+  background: linear-gradient(180deg,
+    rgba(255, 250, 244, 0.05) 0px,
+    rgba(254, 248, 241, 0.12) 40%,
+    rgba(252, 245, 237, 0.22) 100%);
+}
+
+/* ------------------------------------------------- 三、卡片：半透、但自己清楚 */
+
+/*
+ * 卡片用「半透明白」，**不靠大范围模糊**。
+ * 为什么：试过给卡片加 backdrop-filter: blur(22px)，结果整页糊成一片米色 ——
+ * 画反而认不出来了。画要清楚，卡片也要清楚，两件事分开办：
+ *   卡片的不透明度自己就把对比度兜住了（0.88 的暖白 → 正文约 13:1，最淡的次级文字也有 5:1）。
+ * 一点 blur 留着，是为了让玻璃边那圈透上来的画不至于太「硬」。
+ */
+.panel,
+.habit-card,
+.detail-card,
+.state-demo,
+.todo-list,
+.block-empty,
+.addbar,
+.dialog {
+  background: var(--glass-surface);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backdrop-filter: blur(14px) saturate(1.08);
+  border-color: var(--line);
+  /* 外阴影给层次，内高光给「玻璃边」的那点质感 */
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* 小控件不用大阴影，免得糊成一团 */
+.btn,
+.filter-btn { box-shadow: var(--shadow-sm); }
+
+/* ------------------------------------------------- 四、压在画面上的那些文字：各给一片小底 */
+
+/*
+ * 关键决定：**不给整条做底**，只给它里面的文字各做一个小玻璃片。两条理由：
+ *   ① 全宽的条会把画面最清楚的那一整段盖住 —— 那正好是这张图最好看的地方；
+ *   ② 那些条一加纵向内边距就会变高，往下压的是习惯区的高度。
+ *      （实测对照：1280×720 下习惯列表本来就滚 —— 第 6 条在改动前也要滚，
+ *        拿 HEAD 那份跑过同一尺寸确认过。所以这里不是「修了一个 bug」，
+ *        而是**别把原本就紧的地方再压紧一点**。）
+ * 现在这样：纵向不占多余空间，画也露着，文字又有自己的底。
+ *
+ * ⚠️ 看板的 `.navbar`（视图导航）和 `.block-head`（「今天的习惯」那一行标题）
+ *    原来是直接写字在背景上的 —— 换成图片背景之后，那几行字压在画上读不动，
+ *    所以一并收进来。
+ */
+.topbar-left,
+.topbar-right,
+.growth,
+.navbar,
+.block-head {
+  background: var(--glass-bar);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  backdrop-filter: blur(10px) saturate(1.15);
+  border-radius: 999px;
+  /* 那一圈细边**用 inset 阴影画，不用 border** —— border 会实打实占 2px 高度，
+     而这些小片一高，下面就少一行（实测 1280×720 下会挤出一条滚动条）。 */
+  box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--glass-line), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+/* 顶栏改成居中对齐：两组文字各自成了小片，按基线对会对不齐 */
+.topbar { align-items: center; }
+
+/* ⚠️ 纵向内边距一律给 0：这些小片的背景只够「托住」文字就行，
+   多给一像素都会往下压 —— 宁可让它贴着文字，也不挤坏下面的布局 */
+.topbar-left,
+.topbar-right,
+.navbar,
+.block-head { padding: 0 12px; }
+
+/* 成长物条的高度**保持原样**（24px）：换成小片之后它本来会高 6px，
+   那 6px 就是 1280×720 下第 6 个习惯被挤出去的原因 */
+.growth { padding: 0 14px; min-height: 24px; width: fit-content; }
+
+/* 看板导航原来靠一条底线分段；变成小片之后那条线就不需要了
+   （留 1px 宽度不动，只把颜色去掉 —— 免得改了布局高度） */
+.navbar { border-bottom-color: transparent; }
+
+/* ------------------------------------------------- 五、页面音乐开关 */
+
+.music-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 253, 250, 0.9);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, border-color .18s ease;
+}
+.music-toggle .music-icon { font-size: 14px; line-height: 1; }
+.music-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.music-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.music-toggle.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 播放时音符轻轻起伏；prefers-reduced-motion 下完全不动（无障碍底线） */
+@media (prefers-reduced-motion: no-preference) {
+  .music-toggle.is-on .music-icon { animation: music-beat 1.8s ease-in-out infinite; }
+}
+@keyframes music-beat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-1.5px); }
+}
+
+/* ------------------------------------------------- 六、把残留的冷色改暖 */
+
+/* 原来写死的蓝 hover / 蓝边（各自的 CSS 里散着几条），统一换成暖色 */
+.btn-primary:hover { background: #7f3d11; }
+.btn-soft { border-color: rgba(157, 79, 26, 0.26); }
+.btn-soft:hover { background: #f7e2d2; }
+.filter-btn.is-on:hover { background: #7f3d11; border-color: #7f3d11; }
+.habit-card:has(:focus-visible) { border-color: var(--accent); }
+
+/* 卡片上的悬停底色也偏暖一点（原来是冷白 #fafaf8） */
+.habit-row:hover,
+.todo-row:hover { background: rgba(255, 248, 240, 0.9); }
+
+/* 圆角跟着 --radius 一起大一号，观感更软 */
+.btn,
+.filter-btn,
+.music-toggle { border-radius: 999px; }
+
+/* ------------------------------------------------- 七、给画让出地方 */
+
+/*
+ * 内容列从 1080 收窄到 960（两个页面都收）。
+ * 为什么值得动布局参数：这张图最好看的部分在画面中间，而内容列正好也占中间 ——
+ * 列越宽，画就只剩一条缝。收窄 120px，两侧各多让出 60px，画面就从「一条缝」
+ * 变成一圈看得清的边框；960 对一屏六个习惯来说依然宽松，不影响 AC-3。
+ */
+.app { max-width: 960px; }

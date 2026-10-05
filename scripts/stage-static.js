@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// 要发到公网的，就这 7 个 —— 两个页面 + 各自配套的样式和脚本 + 共用的云端接入层
+// 要发到公网的，就这 10 个 —— 两个页面 + 各自配套的样式和脚本 + 共用的两层 + 背景图
 const WHITELIST = [
   'index.html',
   'style.css',
@@ -25,8 +25,14 @@ const WHITELIST = [
   'dashboard.html',
   'dashboard.css',
   'dashboard.js',
-  'cloud.js',   // Day 17 新增：两个页面共用的「读云端」接入层
+  'cloud.js',                    // Day 17：两个页面共用的「读云端」接入层
+  'theme.css',                   // Day 18 加餐：背景 + 主题色 + 音乐开关样式（覆盖层）
+  'theme.js',                    // Day 18 加餐：页面音乐开关（素材不在时自己藏起来）
+  'assets/bg-starry-sea.jpg',    // Day 18 加餐：页面背景插画
 ];
+
+// ⚠️ 故意**不在这里**的：assets/bgm-starfall-sea.ogg（那首商业单曲只在本机用，
+//    见 .gitignore 里的说明）。公网那份页面加载不到它，会自己把音乐开关藏掉。
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'dist');
@@ -36,17 +42,28 @@ function main() {
   //    为什么逐个 unlink，而不是一把 fs.rmSync(dir, {recursive:true})：
   //      递归删除在很多受管环境里会被安全策略拦下来（Day 17 实测踩到：脚本直接崩，
   //      dist/ 还留在半路状态）。逐个删文件在哪都能跑，效果一样，也更说得清删了什么。
+  //    Day 18 加餐补的：白名单里开始有 assets/xxx 这种带目录的条目，
+  //      所以目录**只往下走一层**（够用，也不去碰深层递归删除）。
+  const want = {};
+  for (const name of WHITELIST) want[name] = true;
+
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const removed = [];
   for (const name of fs.readdirSync(OUT_DIR)) {
-    if (WHITELIST.indexOf(name) !== -1) continue;
-    const stale = path.join(OUT_DIR, name);
-    if (fs.lstatSync(stale).isDirectory()) {
-      // dist/ 里本来不该有子目录；真出现了先报出来，别悄悄留着
-      console.warn('dist/ 里有没预料到的子目录，已跳过：' + name);
+    const full = path.join(OUT_DIR, name);
+    if (fs.lstatSync(full).isDirectory()) {
+      for (const sub of fs.readdirSync(full)) {
+        const rel = name + '/' + sub;
+        const subFull = path.join(full, sub);
+        if (!want[rel] && fs.lstatSync(subFull).isFile()) {
+          fs.unlinkSync(subFull);
+          removed.push(rel);
+        }
+      }
       continue;
     }
-    fs.unlinkSync(stale);
+    if (want[name]) continue;
+    fs.unlinkSync(full);
     removed.push(name);
   }
 
@@ -60,7 +77,9 @@ function main() {
       missing.push(name);
       continue;
     }
-    fs.copyFileSync(src, path.join(OUT_DIR, name));
+    const dst = path.join(OUT_DIR, name);
+    fs.mkdirSync(path.dirname(dst), { recursive: true });   // assets/ 这类要先建目录
+    fs.copyFileSync(src, dst);
     copied.push({ name, bytes: fs.statSync(src).size });
   }
 

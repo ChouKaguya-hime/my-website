@@ -29,3 +29,13 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ===== 本地素材：音乐只在这台机器上（Day 18 加餐）=====
+# 背景插画 assets/bg-starry-sea.jpg 是**要进仓库**的（公网那份页面也要用）。
+# 但这首是商业单曲（早見沙織「星降る海」）：公开仓库 + 公开站点都等于公开转载，
+# 所以音乐**既不进 Git，也不上传公网** —— 只在本机陪着页面用。
+#   → 少了它页面照常打开，只是在公网那份上会自动把音乐开关藏起来（见 theme.js）。
+assets/*.ogg
+assets/*.mp3
+assets/*.m4a
+assets/*.wav

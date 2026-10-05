@@ -6,6 +6,9 @@
   <title>习惯看板 · 主视图</title>
   <!-- 相对路径引用样式（T4：file:// 下不能用 / 开头） -->
   <link rel="stylesheet" href="dashboard.css">
+  <!-- Day 18 加餐：主题层（背景插画 + 暖色调 + 音乐开关样式）。
+       必须排在 dashboard.css **后面** —— 它靠覆盖 CSS 变量生效 -->
+  <link rel="stylesheet" href="theme.css">
 </head>
 <body>
   <div class="app">
@@ -20,6 +23,10 @@
       </div>
       <div class="topbar-right">
         <span class="topbar-progress">今天已完成 <strong id="today-count">0 / 0</strong> 件</span>
+        <!-- Day 18 加餐：页面音乐开关。先用 hidden 藏起来 —— theme.js 确认素材在才显示；
+             素材不在（比如公网那份不带音乐）就一直藏着，页面上不留多余的字 -->
+        <button type="button" class="music-toggle" id="music-toggle" hidden
+                aria-pressed="false" title="点一下放音乐"><span class="music-icon" aria-hidden="true">♪</span><span>音乐</span></button>
       </div>
     </header>
 
@@ -329,5 +336,7 @@
   <!-- Day 17：cloud.js 是「读云端」的接入层，必须在 dashboard.js 之前引入 -->
   <script src="cloud.js"></script>
   <script src="dashboard.js"></script>
+  <!-- Day 18 加餐：环境层（页面音乐开关）。放最后 —— 它要等按钮已经出现在 DOM 里 -->
+  <script src="theme.js"></script>
 </body>
 </html>
