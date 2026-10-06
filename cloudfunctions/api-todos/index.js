@@ -15,16 +15,23 @@
  *   ?limit=N           最多返回 N 条（1..200）
  *
  * 连接方式、跨域、错误形状都和 api-habits 一致，见那个文件顶部的注释。
+ *
+ * ── Day 19：拆出数据访问层 ─────────────────────────────────────────────────────
+ *   原来「拼查询地址 + 发请求 + 读密钥」就写在下面（restGet + REST_BASE + PG_API_KEY）。
+ *   今天整段搬进了**同目录的 db.js**。本文件往后只跟数据层说业务问句：
+ *     db.listTodos({ date, limit })  ← 要哪天的、要几条
+ *   判据：**改完以后，本文件里搜不到 fetch、搜不到表名、搜不到 /rest。**
  */
 
 const ENV_ID = process.env.TCB_ENV || process.env.SCF_NAMESPACE || 'unknown';
-const PG_API_KEY = process.env.PG_API_KEY || '';
 
 const SERVICE = 'habit-board-api';
 const FUNC_NAME = 'api-todos';
+// ⚠️ Day 19 只重构了内部实现，**接口契约一个字没动** —— 所以版本号不升，还是 v1.1。
 const CONTRACT_VERSION = 'v1.1';
 
-const REST_BASE = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/v1/rdb/rest';
+// ★ 数据访问层（Day 19 从本文件拆出去的）：查数据库的活全在 db.js 里。
+const db = require('./db');
 
 const LIMIT_MIN = 1;
 const LIMIT_MAX = 200;
@@ -55,22 +62,9 @@ function fail(statusCode, error, message) {
   });
 }
 
-async function restGet(pathAndQuery) {
-  if (!PG_API_KEY) {
-    throw new Error('云函数没配环境变量 PG_API_KEY（数据库连接用的服务端密钥）');
-  }
-  const res = await fetch(REST_BASE + pathAndQuery, {
-    headers: {
-      authorization: 'Bearer ' + PG_API_KEY,
-      accept: 'application/json',
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error('数据库返回 ' + res.status + '：' + String(text).slice(0, 300));
-  }
-  return JSON.parse(text);
-}
+/* ★ Day 19：原来这里躺着 restGet（问 PostgREST 要一段数据），
+   连同 REST_BASE、PG_API_KEY 一起搬到了同目录的 db.js。
+   本文件往后不再直接跟数据库说话 —— 要数据就找 db。 */
 
 function parseLimit(raw) {
   if (raw === undefined || raw === null || raw === '') return null;
@@ -106,11 +100,8 @@ exports.main = async (event, context) => {
     const date = parseDate(q.date);
     const limit = parseLimit(q.limit);
 
-    let path = '/todos?select=id,text,todo_date,done&order=todo_date.desc,id.asc';
-    if (date) path += '&todo_date=eq.' + date;
-    if (limit) path += '&limit=' + limit;
-
-    const rows = await restGet(path);
+    // ★ Day 19：查询地址原来在这里一行行拼；现在只对数据层说「要哪天的、要几条」
+    const rows = await db.listTodos({ date: date, limit: limit });
 
     const data = rows.map(function (t) {
       return {

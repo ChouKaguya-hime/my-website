@@ -28,24 +28,34 @@
  *       为什么两层都要：只有第一层 → 并发下漏；只有第二层 → 前端只能收到一句数据库报错。
  *   ★ 防错误输入：缺 name / 名字是空白 / 类型或次数不合法 → 400 + 中文说清哪一项不对
  *
+ * ── Day 19：这个文件变矮了（拆出数据访问层）────────────────────────────────────
+ *   以前「查数据库」的代码（读密钥、拼查询地址、发请求、解析结果）就写在本文件里，
+ *   和 HTTP 的活混在一起 —— 一个文件里同时有「怎么回 HTTP」和「怎么问数据库」两件事。
+ *   今天把那一整段搬进了**同目录的 db.js**（数据访问层）。
+ *     拆之前：本文件里躺着一组 restGet / restPost / REST_BASE / PG_API_KEY，外加两条查询地址
+ *     拆之后：那些都在 db.js；本文件只调用 db.listHabits() / db.findHabitByName() / db.insertHabit()
+ *   判据很简单：**改完以后，本文件里搜不到 fetch、搜不到表名、搜不到 /rest。**
+ *   为什么值得：以后换数据库、或某个查询要改，只动 db.js ——
+ *   这边的路由、校验、报错文案一行都不用碰。
+ *
  * ── 为什么不用 CloudBase SDK 直连数据库 ────────────────────────────────────────
  *   CloudBase PG 有三条路：小程序 SDK / HTTP API(PostgREST) / PostgreSQL 协议直连。
  *   实测（Day 17）：体验版环境下「直连」走不通；HTTP API 这条路最稳，
  *   而且用 Node 自带的能力就够了 —— 这个函数零依赖。详见 api-contract.md 第 3.6 节。
  *
- * 连接方式：HTTP API + 环境变量里的服务端 API Key
- *   PG_API_KEY 写在云函数的「环境变量」里，不进代码、不进 Git。
+ * 连接方式：HTTP API（PostgREST）+ 环境变量里的服务端 API Key
+ *   这段连接细节现在住在 db.js 顶部；PG_API_KEY 写在云函数的「环境变量」里，不进代码、不进 Git。
  */
 
 const ENV_ID = process.env.TCB_ENV || process.env.SCF_NAMESPACE || 'unknown';
-const PG_API_KEY = process.env.PG_API_KEY || '';
 
 const SERVICE = 'habit-board-api';
 const FUNC_NAME = 'api-habits';
+// ⚠️ Day 19 只重构了内部实现，**接口契约一个字没动** —— 所以版本号不升，还是 v1.2。
 const CONTRACT_VERSION = 'v1.2'; // Day 18：本函数新增了 POST，契约从 v1.1 升到 v1.2
 
-// CloudBase PG 的 HTTP API（PostgREST）入口
-const REST_BASE = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/v1/rdb/rest';
+// ★ 数据访问层（Day 19 从本文件拆出去的）：查数据库的活全在 db.js 里。
+const db = require('./db');
 
 // 返回条数上限：防着有人拿 ?limit=999999 来打
 const LIMIT_MIN = 1;
@@ -95,47 +105,9 @@ function fail(statusCode, error, message, extraHeaders) {
   );
 }
 
-/** 问 PostgREST 要一段数据；非 2xx 就把原文带出来，方便排查 */
-async function restGet(pathAndQuery) {
-  if (!PG_API_KEY) {
-    throw new Error('云函数没配环境变量 PG_API_KEY（数据库连接用的服务端密钥）');
-  }
-  const res = await fetch(REST_BASE + pathAndQuery, {
-    headers: {
-      authorization: 'Bearer ' + PG_API_KEY,
-      accept: 'application/json',
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error('数据库返回 ' + res.status + '：' + String(text).slice(0, 300));
-  }
-  return JSON.parse(text);
-}
-
-/**
- * 往表里插一行。
- * 不抛异常 —— 把状态码和原文原样带回去，让调用方决定怎么翻译成给用户看的话
- * （重复提交那次会返回 409，那不是一个「错误」，是一个要好好解释的正常结果）。
- */
-async function restPost(path, row) {
-  if (!PG_API_KEY) {
-    throw new Error('云函数没配环境变量 PG_API_KEY（数据库连接用的服务端密钥）');
-  }
-  const res = await fetch(REST_BASE + path, {
-    method: 'POST',
-    headers: {
-      authorization: 'Bearer ' + PG_API_KEY,
-      'content-type': 'application/json',
-      accept: 'application/json',
-      // 让 PostgREST 把插进去的那一行回给我们（省掉一次再查）
-      prefer: 'return=representation',
-    },
-    body: JSON.stringify(row),
-  });
-  const text = await res.text();
-  return { status: res.status, text: text };
-}
+/* ★ Day 19：原来这里躺着 restGet / restPost 两个函数（问数据库要一段数据 / 往表里插一行）。
+   它们连同 REST_BASE、PG_API_KEY 一起，搬到了同目录的 db.js。
+   本文件往后不再直接跟数据库说话 —— 要数据就找 db。 */
 
 /** 只接受 1..200 的整数；没传就返回 null（表示「不限制」） */
 function parseLimit(raw) {
@@ -324,13 +296,9 @@ exports.main = async (event, context) => {
     try {
       const limit = parseLimit(query(event).limit);
 
-      const habitQuery =
-        '/habits?select=id,name,freq_type,freq_count,created_at&order=created_at.asc,id.asc' +
-        (limit ? '&limit=' + limit : '');
-      const recordQuery = '/habit_records?select=habit_id,done_date&order=done_date.desc';
-
-      const habits = await restGet(habitQuery);
-      const records = await restGet(recordQuery);
+      // ★ Day 19：两条查询原来写成两串地址、交给 restGet；现在只对数据层说「要什么」
+      const habits = await db.listHabits(limit);
+      const records = await db.listHabitRecords();
 
       // 把「一行一次打卡」聚合成前端要的 doneDates 数组（形状对不上的那一处）
       const datesByHabit = {};
@@ -401,8 +369,8 @@ exports.main = async (event, context) => {
 
     // ---------- 第 3 步：先查一眼重名（防重复提交的第一层：为了说人话）----------
     try {
-      const dup = await restGet('/habits?select=id&name=eq.' + encodeURIComponent(habit.name) + '&limit=1');
-      if (Array.isArray(dup) && dup.length > 0) {
+      const dup = await db.findHabitByName(habit.name);
+      if (dup) {
         return done(
           fail(409, 'conflict', '已经有一个叫「' + habit.name + '」的习惯了，不用再加一遍', {
             allow: 'GET, POST, OPTIONS',
@@ -417,7 +385,7 @@ exports.main = async (event, context) => {
 
     // ---------- 第 4 步：插进去 ----------
     try {
-      const res = await restPost('/habits', {
+      const res = await db.insertHabit({
         id: habit.id,
         name: habit.name,
         freq_type: habit.freqType,
