@@ -1348,7 +1348,35 @@ function enterStates() {
     renderHints();
   }
 
+  /*
+   * Day 20 加练：这一屏当「检查台」用，顺手标出「这份数据是几点从云端读回来的」。
+   * 为什么放这儿而不是只算一次：cloud.js 读完云端会重跑一遍路由（rerender = renderRoute），
+   * 这一行因此会**自己刷新**到最新那次读回来的时刻 —— 不用轮询，也不用用户手动点。
+   */
+  renderStatesUpdated();
+
   renderStatesDemo();
+}
+
+/**
+ * Day 20 加练：检查台顶部那行「最后更新时间」。
+ * 时刻只存在 cloud.js 手里（它每次成功读回云端都会记一笔），这里**只读不拉**。
+ * 读不到就老实显示「—」—— 宁可说「不知道」，也不编一个时间出来。
+ */
+function renderStatesUpdated() {
+  var box = el('states-updated');
+  if (!box) return;
+
+  var cloud = window.HabitBoardCloud;
+  var text = (cloud && typeof cloud.loadedAtText === 'function') ? cloud.loadedAtText() : '';
+
+  if (text) {
+    box.innerHTML = '最后更新时间：<b>' + text + '</b>　·　这份数据来自云端数据库';
+    box.title = '每次打开页面、或从云端读到新数据时都会更新；时间按本机时区显示';
+  } else {
+    box.innerHTML = '最后更新时间：<b>—</b>　·　这次没读到云端，页面用的是本机数据';
+    box.title = '云端接口没读到（断网 / 接口没部署），页面回落到浏览器本地存储，所以没有时间可显示';
+  }
 }
 
 var demoBuilt = false;

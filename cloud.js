@@ -13,6 +13,10 @@
         所以本机改动在当前这次打开里有效，刷新后会被云端那份覆盖。这是刻意的，不是 bug。
 
    守项目硬约束：T1 不引外部资源（这是本地文件）、T2 不用 ES Module（用 IIFE + var）。
+   --------------------------------------------------------------------------
+   Day 20 加练：多记一样东西 —— **「这份数据是几点从云端读回来的」**（CLOUD.loadedAt）。
+   它只回答一个问题：「我现在看到的数，新鲜吗？」页面上的「检查台」（状态自查那一屏）
+   把它显示出来；读不到云端时它老实显示「—」，不编一个时间。
    ========================================================================== */
 (function (global) {
   'use strict';
@@ -81,12 +85,32 @@
     }
   }
 
+  /**
+   * Day 20 加练：把「最近一次成功从云端读回来」的时刻写成看得懂的一句。
+   * 为什么自己拼字符串、不用 toLocaleString：后者的格式随浏览器语言设置变，
+   * 不同机器上截出来的图长得不一样；验收要的是稳定可读的 'YYYY-MM-DD HH:MM:SS'。
+   */
+  function loadedAtText() {
+    if (!CLOUD.loadedAt) return '';
+    var d = new Date(CLOUD.loadedAt);
+    if (isNaN(d.getTime())) return '';
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+      + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
   var CLOUD = {
     api: API,
 
     /* 页面上现在显示的这份数据来自哪 —— 'local' / 'cloud'。排查和自动化检查都靠它 */
     source: 'local',
     error: null,
+
+    /* ★ Day 20 加练：最近一次成功从云端读回来的时刻（ISO 字符串）。null = 这次没读到 */
+    loadedAt: null,
+
+    /* 上面那个时刻的「给人看」版本；没读到就是空串 */
+    loadedAtText: loadedAtText,
 
     load: load,
 
@@ -107,6 +131,7 @@
         opts.state.todos = data.todos;
         CLOUD.source = 'cloud';
         CLOUD.error = null;
+        CLOUD.loadedAt = data.at;          // ★ Day 20 加练：记下这一份是刚读回来的
         try { opts.save(); } catch (e) { /* 存不进去不影响此刻显示 */ }
         opts.rerender();
         paintSource('cloud');

@@ -558,6 +558,12 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 /* 视图说明（状态自查页顶部那一句） */
 .view-lead { color: var(--muted); font-size: 13px; margin: 0; max-width: 660px; }
 
+/* ---------------------------------------------------------------- 检查台：最后更新时间（Day 20 加练）
+   状态自查那一屏当「检查台」用 —— 这行回答「我看到的这份数，新鲜吗」。
+   与上面的说明文字拉开 10px，时间用正文色 + 加粗，扫一眼就能看到。 */
+.states-updated { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+.states-updated b { color: var(--text); font-weight: 600; letter-spacing: 0.2px; }
+
 /* ---------------------------------------------------------------- 视图导航条（Day 13） */
 
 .navbar {
