@@ -1,7 +1,7 @@
 # api-contract.md｜接口契约
 
 > **项目**：`my-website`（习惯规划板）
-> **版本**：v1.2 ｜ **日期**：2026-10-05（Day 18）｜ **作者**：斌（与 AI 协作）
+> **版本**：v1.3 ｜ **日期**：2026-10-09（Day 22）｜ **作者**：斌（与 AI 协作）
 > **上游文档**：`PRD.md`（做什么）、`TECH_DESIGN.md`（怎么实现）
 > **本文回答一个问题**：**前端和后端之间，一个请求长什么样、一个回应长什么样。**
 > 两边都照这一份写，就不会出现「前端以为字段叫 A、后端返回的是 B」。
@@ -24,9 +24,9 @@
 
 ---
 
-## 1. 当前实现的范围（Day 18 更新）
+## 1. 当前实现的范围（Day 22 更新）
 
-**已经上了公网的接口，一共四个**：
+**已经上了公网的接口，一共六个动作（挂在四个函数上）**：
 
 | 接口 | 什么时候上的 | 干什么 |
 | --- | --- | --- |
@@ -34,26 +34,39 @@
 | `GET /api/habits` | Day 17 | 读习惯列表，含每个习惯的打卡日期 |
 | `GET /api/todos` | Day 17 | 读待办列表 |
 | **`POST /api/habits`** | **Day 18** | **新建一个习惯（写进数据库）** |
+| **`PATCH /api/habits/<id>`** | **Day 22** | **改一条习惯（只改传进来的字段）** |
+| **`DELETE /api/habits/<id>`** | **Day 22** | **删一条习惯（默认软删除，可找回）** |
 
 Day 15 只做一个接口，是为了先证明第一件事：**公网能打到我的云函数**。
 Day 17 要证明的是下一件事：**数据真的是从数据库里读出来的**，
 而不是页面上那份浏览器本地存储 —— 而且这两样东西的形状还不一样（见第 3.1 节）。
 Day 18 要证明的是第三件事：**接口能把数据写回去，而且重复提交不会写出两条**。
+Day 22 要证明的是第四件事：**「增删改查」四类操作能形成一个闭环** ——
+一条数据能被建出来、被改到、被删掉，而删掉之后「读」这一侧真的看不到了。
 
-⚠️ 注意 `GET` 和 `POST /api/habits` 是**同一个地址**，靠 HTTP 方法区分动作
-（第 4.1 节的规矩：地址里不写动词）—— 所以它们挂在同一个云函数上，不是两个。
+⚠️ 注意 `GET` / `POST /api/habits` 是**同一个地址**，靠 HTTP 方法区分动作；
+而 `PATCH` / `DELETE` 是**单条资源地址** `/api/habits/<id>`（第 4.1 节的规矩：资源用复数、
+一条和多条靠「地址里有没有带 ID」区分）。两段地址都挂在**同一个云函数** `api-habits` 上 ——
+原因见下面这段（网关是路径前缀匹配）。
+
+> 📌 **Day 22 实测到的一件事（部署前必须先知道）**：CloudBase 的 HTTP 访问服务是
+> **路径前缀匹配 + 剥掉前缀** —— 把路由配成 `/api/habits` 之后，
+> 请求 `/api/habits/h_seed_water` 确实会打到 `api-habits` 这个函数，
+> **但云函数收到的 `event.path` 是 `/h_seed_water`，前面那段 `/api/habits` 被网关吃掉了。**
+> 所以解析 id 时必须同时认两种形状（`/api/habits/<id>` 和裸的 `/<id>`）。
+> 这个坑当天踩过：按「完整路径」解析 → 永远解析不出 id → PATCH/DELETE 一路回 405。
 
 | 还没做的 | 为什么现在不做 | 什么时候 |
 | --- | --- | --- |
-| 习惯 / 待办的**改动与删除**（`PATCH` / `DELETE`） | Day 18 只做「新建」这一件事；改和删是同一类活，留着一起做，免得把页面接成「能加不能删」的半成品 | 第 4 周 |
-| 待办的**写入**（`POST /api/todos`） | 和习惯的写入是同一套做法，先把「习惯」这一条路走通、验透 | 第 4 周 |
-| **批量写入**（一次提交多条） | 单条还没在真环境跑稳之前，批量只会让出错时更难定位是哪一条 | 需要时再说 |
+| 习惯的**打卡/取消打卡**（勾选） | 现状是「改一条习惯」，而「今天完成没完成」改的是 `habit_records` 那张表，是另一件事 | 第 4 周之后 |
+| 待办的**改与删**（`PATCH`/`DELETE /api/todos/<id>`） | 和习惯的改删是同一套做法，先把习惯这条路走通、验透 | 需要时再说 |
+| 待办的**写入**（`POST /api/todos`） | 同上 | 需要时再说 |
+| **批量写入 / 批量删除** | 单条还没在真环境跑稳之前，批量只会让出错时更难定位是哪一条 | 需要时再说 |
 | 登录 / 鉴权 | 本期只有一个用户（`PRD.md` 第 6 节） | 未排期 |
 
-> ⚠️ **页面上的「写」还没接**：Day 18 做的是**接口**，前端一个字没改。
+> ⚠️ **页面上的「写」还没接**：Day 18 做的是**接口**，Day 22 做的还是**接口**，前端两个字没改。
 > 所以今天在页面上新增 / 勾选 / 删除，**刷新之后仍然会被数据库那一份盖掉** ——
-> 这是刻意排的顺序（先把接口做扎实、再动前端），不是 bug。
-> 把页面接过去要连 `PATCH` / `DELETE` 一起接（勾选和删除都得用），那是第 4 周的事。
+> 这是刻意排的顺序（先把四类操作的接口做扎实、再动前端），不是 bug。
 > 页面上那个「云端数据库 / 本机数据」小标仍然有效：它说的是**读**的那一份。
 
 ---
@@ -341,17 +354,22 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 
 ```json
 { "ok": false, "service": "habit-board-api", "function": "api-habits",
-  "version": "v1.2", "error": "method_not_allowed", "message": "这个接口只接受 GET（读）和 POST（新建）" }
+  "version": "v1.3", "error": "method_not_allowed", "message": "这个接口只接受 GET, POST, PATCH, DELETE, OPTIONS" }
 ```
 
 | 情况 | HTTP | `error` | `message`（给人看） |
 | --- | --- | --- | --- |
-| 用了 `PATCH` / `DELETE` / `PUT` | 405 | `method_not_allowed` | 这个接口只接受 GET（读）和 POST（新建） |
+| 用了 `PUT` 等本接口不支持的方法 | 405 | `method_not_allowed` | 这个接口只接受 GET, POST, PATCH, DELETE, OPTIONS |
+| 用了 `PATCH` / `DELETE`，但**地址里没带 id** | 405 | `method_not_allowed` | 改/删一条习惯要把 id 写进地址：`PATCH|DELETE /api/habits/<id>` |
 | 数据库连不上 / 没配密钥 / SQL 出错 | 500 | `server_error` | 读取习惯失败：<原因> |
 | 跨域预检 `OPTIONS` | 204 | —（空 body） | — |
 
-> ⚠️ **Day 18 起 `/api/habits` 也能 `POST` 了**，所以上表说的「只接受 GET」变成了「只接受 GET 和 POST」；
-> 写接口自己的出错情况（缺字段、重名……）更多，单独列在第 3.8 节的后半段。
+> ⚠️ **Day 18 起 `/api/habits` 也能 `POST` 了；Day 22 起 `PATCH` / `DELETE` 也上了** ——
+> 所以上表说的「只接受 GET」变成了「只接受 GET, POST, PATCH, DELETE」。
+> 写接口自己的出错情况（缺字段、重名、找不到……）更多，单独列在第 3.8 / 3.11 / 3.12 节。
+>
+> ⚠️ **`allow` 响应头**跟着一起变：Day 18 是 `GET, POST, OPTIONS`，
+> **Day 22 起是 `GET, POST, PATCH, DELETE, OPTIONS`**（按 HTTP 的规矩告诉对方这个地址能用什么方法）。
 
 **关键点：出错也要有结构，字段名和成功时保持一致。** 前端一套代码就能读两种情况，
 不用「先判断字段存不存在」再决定怎么读。
@@ -387,7 +405,7 @@ CloudBase 的 PostgreSQL 有**三条路**能走，官方文档写得很清楚，
 | 响应头 | 值 | 为什么 |
 | --- | --- | --- |
 | `access-control-allow-origin` | `*` | 页面在 `xxx.tcloudbaseapp.com`，接口在 `xxx.app.tcloudbase.com`，**不同源**，不配浏览器会直接拦掉请求 |
-| `access-control-allow-methods` | `GET, POST, OPTIONS` | Day 17 只有读；**Day 18 加了 POST** —— 当时那句「写接口上线时这里要跟着加」，今天兑现了 |
+| `access-control-allow-methods` | `GET, POST, PATCH, DELETE, OPTIONS` | Day 17 只有读；Day 18 加了 `POST`；**Day 22 又加了 `PATCH` / `DELETE`** —— 漏一个，那一类请求就会在预检那一步被浏览器拦下 |
 | `access-control-max-age` | `86400` | 预检结果缓存一天，少发一次 OPTIONS |
 
 > ⚠️ **`*` 是「本期只有一个用户、没有登录」前提下的选择**（`PRD.md` 第 6 节）。
@@ -433,7 +451,7 @@ curl -s -X POST "https://<环境ID>-1499798330.ap-shanghai.app.tcloudbase.com/ap
   "ok": true,
   "service": "habit-board-api",
   "function": "api-habits",
-  "version": "v1.2",
+  "version": "v1.3",
   "envId": "habit-board-d0gum6nqu512acc29",
   "generatedAt": "2026-10-05T01:42:20.492Z",
   "data": {
@@ -475,7 +493,7 @@ curl -s -X POST "https://<环境ID>-1499798330.ap-shanghai.app.tcloudbase.com/ap
 | **这个名字已经有了** | **409** | **`conflict`** | 已经有一个叫「睡前不看手机」的习惯了，不用再加一遍 |
 | `id` 已经被占用 | 409 | `conflict` | 这个 id 已经被占用了（「h_…」），换一个再试 |
 | 数据库连不上 / 写入出错 | 500 | `server_error` | 写入习惯失败：<原因> |
-| 用了 `PATCH` / `DELETE` / `PUT` | 405 | `method_not_allowed` | 这个接口只接受 GET（读）和 POST（新建） |
+| 用了 `PUT` 等不支持的方法 | 405 | `method_not_allowed` | 这个接口只接受 GET, POST, PATCH, DELETE, OPTIONS |
 
 **为什么「重名」用 `409` 而不是 `400`**：
 `400` 是「你这次请求本身写错了」（少字段、格式不对）—— 改对了就能过；
@@ -483,7 +501,7 @@ curl -s -X POST "https://<环境ID>-1499798330.ap-shanghai.app.tcloudbase.com/ap
 前端要区别对待：`400` 应该把用户拉回去改输入框，`409` 应该告诉他「这条已经有了，不用再加」。
 （`conflict` 是 Day 18 新加的错误码，见第 4.4 节。）
 
-另外，**405 会带一个 `allow: GET, POST, OPTIONS` 响应头** —— 按 HTTP 的规矩告诉对方
+另外，**405 会带一个 `allow: GET, POST, PATCH, DELETE, OPTIONS` 响应头** —— 按 HTTP 的规矩告诉对方
 「这个地址能用什么方法」，省得靠猜。
 
 ---
@@ -546,7 +564,7 @@ tcb db execute -e $ENV --sql "DELETE FROM habits WHERE name = '并发测试-勿�
 
 ```json
 {"at":"2026-10-05T01:37:22.637Z","service":"habit-board-api","function":"api-habits",
- "version":"v1.2","requestId":"local-B1","method":"POST","status":201,"ms":181,
+ "version":"v1.3","requestId":"local-B1","method":"POST","status":201,"ms":181,
  "outcome":"created","id":"h_muukxyqhvf7a6","name":"Day18 自检-勿留"}
 ```
 
@@ -555,7 +573,7 @@ tcb db execute -e $ENV --sql "DELETE FROM habits WHERE name = '并发测试-勿�
 | `at` | 服务端时间（ISO 8601 UTC） |
 | `requestId` | 这一次请求的编号 —— **排障的抓手**：用户说「我提交失败了」，拿它去日志里搜就完了 |
 | `method` / `status` / `ms` | 什么方法、回了什么状态码、花了多久 |
-| `outcome` | 这次到底发生了什么：`read_ok` / `created` / `duplicate` / `bad_request` / `method_not_allowed` / `write_failed` … |
+| `outcome` | 这次到底发生了什么：`read_ok` / `created` / `duplicate` / `bad_request` / `method_not_allowed` / `write_failed`（Day 18）；**Day 22 新增** `updated` / `deleted_soft` / `deleted_hard` / `restored` / `not_found` / `already_deleted` / `update_failed` / `delete_failed` |
 | `layer` | 只在 `duplicate` 时出现：`precheck`（第一层拦的）/ `db_unique`（第二层兜的） |
 
 **两条自律**：① 一行就够，不刷屏；② **日志绝不能影响接口** —— 打日志整段包在 `try/catch` 里，
@@ -567,7 +585,203 @@ tcb db execute -e $ENV --sql "DELETE FROM habits WHERE name = '并发测试-勿�
 
 ---
 
-## 4. 全项目统一约定（Day 16–20 沿用）
+### 3.11 `PATCH /api/habits/<id>` —— 改一条习惯（Day 22 新增）
+
+#### 请求
+
+| 项 | 值 |
+| --- | --- |
+| 方法 | `PATCH` |
+| 地址 | `https://<环境ID>-1499798330.ap-shanghai.app.tcloudbase.com/api/habits/<id>` |
+| 请求头 | `content-type: application/json; charset=utf-8` |
+| 请求体 | 一个 JSON 对象，**只放要改的字段**（见下表） |
+
+| 字段 | 必填 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| `name` | 可选 | string | 新的习惯名称。前后空格去掉、不能为空、最长 50 字 |
+| `freqType` | 可选 | string | `daily` / `weekly` |
+| `freqCount` | 可选 | number | 1–7 的整数；**`freqType` 是 `daily` 时一律存 7** |
+
+**三条硬规矩**：
+
+1. **至少带一个字段** —— 一个都没带（或只带了 `id` / `createdAt`）→ `400`。
+   因为那样这个请求什么都没干，却回一个「成功」，是最误导人的回答。
+2. **`id` / `createdAt` 改不了** —— 它们不在白名单里，传了也被忽略。
+   `id` 是这条记录的身份（改了等于换了一条）；`createdAt` 是「服务器那边的今天」，客户端说了不算。
+3. **地址里必须带 id** —— 只写 `/api/habits` 的 `PATCH` → `405`。**绝不去猜「他想改哪一条」。**
+
+```bash
+curl -s -X PATCH "$B/api/habits/h_seed_water" \
+  -H 'content-type: application/json' \
+  -d '{"name":"每天喝够 8 杯水"}'
+```
+
+#### 成功：`200 OK`
+
+`data` 是**改完的那一条**，形状和 `GET /api/habits` 列表里的元素**完全一样**（含 `doneDates`）：
+
+```json
+{
+  "ok": true, "service": "habit-board-api", "function": "api-habits", "version": "v1.3",
+  "envId": "habit-board-d0gum6nqu512acc29",
+  "generatedAt": "2026-10-09T02:19:40.375Z",
+  "data": { "id": "h_seed_water", "name": "每天喝够 8 杯水", "freqType": "daily",
+            "freqCount": 7, "createdAt": "2026-08-25", "doneDates": ["2026-10-04", "2026-10-03"] }
+}
+```
+
+#### 出错时会回什么
+
+| 情况 | HTTP | `error` | `message`（给人看） |
+| --- | --- | --- | --- |
+| 地址里没带 id | 405 | `method_not_allowed` | 改一条习惯要把 id 写进地址：PATCH /api/habits/<id> |
+| 地址里的 id 格式不对 | 400 | `bad_request` | 地址里的 id 格式不对：要以 h_ 开头… |
+| **这个 id 不存在**（或已被删） | **404** | **`not_found`** | 没有找到 id 为「h_…」的习惯 |
+| 请求体是空的 / 不是合法 JSON | 400 | `bad_request` | 请求体是空的：要带一段 JSON，写明改什么… |
+| 请求体是 `{}`（没字段可改） | 400 | `bad_request` | 没有要改的字段：请至少带上 name / freqType / freqCount 里的一个 |
+| `name` 为空 / 超长 / 类型不对 | 400 | `bad_request` | （同 §3.8 的写法） |
+| **改成的新名字已经有了** | **409** | **`conflict`** | 已经有一个叫「X」的习惯了 |
+| 数据库出错 | 500 | `server_error` | 修改习惯失败：<原因> |
+
+> **为什么改之前要「先查在不在」（而不是直接 UPDATE）**：
+> 如果直接 UPDATE 一个不存在的 id，数据库会安静地影响 0 行、HTTP 还是回成功 ——
+> 用户以为改生效了，其实什么也没发生。所以先 `findHabitById` 一下，不在就 **404**，
+> **宁可明确失败，也不要一个假成功**。这也正是第 4.4 节里 `not_found`(404) 预留了四天、
+> 今天第一次真正用上的地方。
+
+---
+
+### 3.12 `DELETE /api/habits/<id>` —— 删一条习惯（Day 22 新增）
+
+#### 请求
+
+| 项 | 值 |
+| --- | --- |
+| 方法 | `DELETE` |
+| 地址 | `https://<环境ID>-1499798330.ap-shanghai.app.tcloudbase.com/api/habits/<id>` |
+| 请求体 | **没有**（删哪一条，地址里已经写死了） |
+| 查询参数 | `?hard=true` 走真删；`?restore=true` 把软删的**找回**（余力加练） |
+
+```bash
+curl -s -X DELETE "$B/api/habits/h_seed_water"              # 默认：软删除（可找回）
+curl -s -X DELETE "$B/api/habits/h_seed_water?hard=true"    # 真删：从表里抹掉，找不回
+curl -s -X DELETE "$B/api/habits/h_seed_water?restore=true" # 把软删的那条找回来
+```
+
+#### 成功：`200 OK`
+
+```json
+{
+  "ok": true, "service": "habit-board-api", "function": "api-habits", "version": "v1.3",
+  "envId": "habit-board-d0gum6nqu512acc29",
+  "generatedAt": "2026-10-09T02:19:41.080Z",
+  "deleted": { "mode": "soft", "recoverable": true },
+  "data": { "id": "h_seed_water", "name": "每天喝够 8 杯水", "freqType": "daily",
+            "freqCount": 7, "createdAt": "2026-08-25", "doneDates": ["2026-10-04", "2026-10-03"] }
+}
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `deleted.mode` | `"soft"`（只打标记，数据还在）/ `"hard"`（真删，从表里抹掉） |
+| `deleted.recoverable` | 还能不能找回。`soft` → `true`；`hard` → `false` |
+| `data` | **被删掉的那一条**（快照）—— 让人一眼能核对「我删的就是这一条」 |
+
+#### 出错时会回什么
+
+| 情况 | HTTP | `error` | `message`（给人看） |
+| --- | --- | --- | --- |
+| **地址里没带 id（想删全部）** | **405** | **`method_not_allowed`** | 删一条习惯必须把 id 写进地址：DELETE /api/habits/<id>；本接口不提供「删除全部」 |
+| 地址里的 id 格式不对 | 400 | `bad_request` | 地址里的 id 格式不对… |
+| 这个 id 不存在 | 404 | `not_found` | 没有找到 id 为「h_…」的习惯 |
+| 对**已经软删过**的再删一次 | 404 | `not_found` | id 为「h_…」的习惯已经被删除了（要找回它加 ?restore=true） |
+| 对**没被删**的做 `?restore=true` | 409 | `conflict` | id 为「h_…」的习惯本来就没被删，不用恢复 |
+| 数据库出错 | 500 | `server_error` | 删除习惯失败：<原因> |
+
+---
+
+### 3.13 ⭐ 今天要回答的那个问题：**删除为什么比新增更容易出事？你在哪加了确认？**
+
+#### 一、为什么「删」比「增」危险
+
+四类操作里，**只有「删」会丢数据**。把它们摆一起看就清楚了：
+
+| 操作 | 做错了会怎样 | 能不能救 |
+| --- | --- | --- |
+| 增（POST） | 多出一条 | ✅ 删掉就行，代价小 |
+| 查（GET） | 什么都没发生 | ✅ 本来就不改数据 |
+| 改（PATCH） | 某个字段被写坏 | ⚠️ 知道旧值就能改回；不知道就麻烦了 |
+| **删（DELETE）** | **数据没了**，而且**连它的打卡记录一起没** | ❌ **默认救不回** |
+
+还有两条让「删」更容易失控的地方：
+
+1. **影响面被外键放大**：`habit_records` 的外键是 `ON DELETE CASCADE` ——
+   删**一个习惯**，它名下的**全部打卡记录**会跟着一起消失。删一行，掉一片。
+2. **「写错地址」的后果不对称**：`POST /api/habits` 写错地址顶多 404；
+   而 `DELETE` 一旦地址少写一段、或者服务端把「没带 id」理解成「删全部」，
+   丢掉的就是整张表。
+
+#### 二、我在三处加了「确认」（外加一层余力加练）
+
+| # | 确认加在哪 | 具体是什么 | 挡住了什么 |
+| --- | --- | --- | --- |
+| **①** | **地址必须带精确的 id** | `DELETE /api/habits/<id>`；不带 id 的 `DELETE /api/habits` **一律 405** | 从设计上**取消「删全部」这个操作** —— 手一抖删全库这条路根本不存在 |
+| **②** | **删之前先确认它在不在** | 先 `findHabitById`；不在 → **404**，**绝不静默成功** | 「删了个不存在的东西」却回成功 —— 那会让人误判「删掉了」 |
+| **③** | **删完把删掉的那条回显** | 响应里的 `data` = 被删记录的快照（含 `name`） | 删错的时候，**当场就能从返回里看出删的是哪一条** |
+| **＋** | **余力加练：默认软删除** | 默认只把 `is_deleted` 置 `true`（读时跳过），`?hard=true` 才真删；`?restore=true` 能找回 | 把「删错了」从**不可逆**变成**可逆** —— 这是对「删」最实在的一层保险 |
+
+> **一句话记法**：**新增防的是「重复」，删除防的是「删错」。**
+> 防重复靠数据库的唯一索引（§3.9）；防删错靠上面这四处「先确认、再动手、留退路」。
+
+#### 三、软删除是怎么实现的（不真删，读时跳过）
+
+| 环节 | 做了什么 |
+| --- | --- |
+| 表结构 | `habits` 加一列 `is_deleted BOOLEAN NOT NULL DEFAULT false`（`db/schema.sql`） |
+| 删（默认） | `PATCH /habits?id=eq.<id>` 把 `is_deleted` 置 `true` —— **数据一个字节没少** |
+| 读 | `listHabits` 永远带上 `&is_deleted=is.false` —— **被软删的记录从「读」这一层就看不见了** |
+| 找回 | `?restore=true` → 把 `is_deleted` 置回 `false`，它立刻又出现在列表里 |
+| 唯一索引 | 从「全表唯一」改成**部分唯一** `WHERE is_deleted = false` —— 否则「删掉『喝水』后再建一个『喝水』」会被已删的那条占着名字、建不出来 |
+
+> ⚠️ **一个必须讲清的代价**：软删除 = 「读」永远要记得过滤 `is_deleted`。
+> 现在只有 `listHabits` / `findHabitByName` 两处读，都加上了；
+> **将来每新增一个读的口子（比如「读单条」「统计」），都必须记得带上这个条件** ——
+> 漏一处，被删的记录就会从那处漏出来。这是软删除的固有成本，不是这次没做好。
+
+#### 四、四类操作闭环怎么复现（都能照着重跑）
+
+```bash
+ENV=habit-board-d0gum6nqu512acc29
+B="https://$ENV-1499798330.ap-shanghai.app.tcloudbase.com"
+
+# 增：建一条 → 201
+curl -s -X POST "$B/api/habits" -H 'content-type: application/json' \
+  -d '{"name":"Day22 演示 · 每天冥想 10 分钟","freqType":"weekly","freqCount":2}'
+ID=h_xxxxxx   # 用上一步返回的 data.id
+
+# 查：读回列表 → 能看到它
+curl -s "$B/api/habits" | grep -o "$ID"
+
+# 改：改名字 → 200，data 是新值
+curl -s -X PATCH "$B/api/habits/$ID" -H 'content-type: application/json' \
+  -d '{"name":"Day22 演示 · 每天冥想 15 分钟","freqType":"daily"}'
+
+# 删：默认软删 → 200，deleted.mode = soft
+curl -s -X DELETE "$B/api/habits/$ID"
+# 删完再读 → ★ 它不在返回里了 ★
+curl -s "$B/api/habits" | grep -o "$ID"     # 期望：无输出
+
+# 删错了能找回（余力加练）
+curl -s -X DELETE "$B/api/habits/$ID?restore=true"
+curl -s "$B/api/habits" | grep -o "$ID"     # 又出现了
+
+# 收尾：真删干净，不留垃圾
+curl -s -X DELETE "$B/api/habits/$ID?hard=true"
+```
+
+---
+
+## 4. 全项目统一约定（Day 16–22 沿用）
 
 这一节不是今天要实现的，是**今天先定下来、后面照着做**的。今天只实现它的最小一份（就是上面那个健康检查）。
 
@@ -582,10 +796,13 @@ https://<环境ID>.service.tcloudbase.com/<功能>[/<资源>][/<资源ID>]
 | `/api-health` | 服务自身的状态 | ✅ Day 15（历史遗留了连字符写法，保留不动，免得把已发出去的地址弄失效） |
 | `/api/habits` | 习惯列表 | ✅ Day 17 |
 | `/api/todos` | 待办列表 | ✅ Day 17 |
-| `/api/habits/h_1234` | 某一个习惯 | 还没做（Day 18+，如果需要的话） |
+| `/api/habits/h_1234` | 某一个习惯 | ✅ **Day 22**（`PATCH` 改它 / `DELETE` 删它） |
 
 - **资源用复数**（`habits`，不是 `habit`）——一条和多条地址长一样，靠有没有带 ID 区分。
 - **动作交给 HTTP 方法**：读用 `GET`、新增用 `POST`、改动用 `PATCH`、删除用 `DELETE`。地址里不写动词（不写 `/getHabits`）。
+- ⚠️ **`/api/habits/<id>` 不用另配网关路由**：CloudBase 的 HTTP 访问服务是**路径前缀匹配**，
+  配了 `/api/habits` 就把它的子路径一起收了；但**前缀会被网关剥掉**（函数收到的是 `/h_1234`，
+  不是 `/api/habits/h_1234`）—— 解析 id 时两种形状都要认（见 §1 那条实测笔记）。
 
 ### 4.2 数据格式
 
@@ -627,7 +844,7 @@ https://<环境ID>.service.tcloudbase.com/<功能>[/<资源>][/<资源ID>]
 | `server_error` | 500 | 服务自己出错了（连不上库、SQL 出错等） | ✅ Day 17 |
 | `bad_request` | 400 | 请求内容不合法（缺字段、格式错、不是合法 JSON） | ✅ **Day 18**（写接口第一次真正用上） |
 | `conflict` | **409** | 请求没毛病，但**和库里已有的数据冲突了**（重名、id 被占） | ✅ **Day 18（新增）** |
-| `not_found` | 404 | 要的资源不存在 | 预留，第 4 周做单条资源时用 |
+| `not_found` | 404 | 要的资源不存在（改了/删了一个不存在的 id） | ✅ **Day 22**（做单条资源时第一次用上） |
 
 > **`400` 和 `409` 为什么要分开**：`400` 是「你这次请求写错了」→ 前端该让用户改输入；
 > `409` 是「你写得没错，但这条已经有了」→ 前端该告诉用户「不用再加」，别让他白改一遍。
@@ -639,15 +856,15 @@ https://<环境ID>.service.tcloudbase.com/<功能>[/<资源>][/<资源ID>]
 
 ### 4.5 版本
 
-后端版本放在返回体的 `version` 字段里（Day 15 是 `"v1"`，Day 17 起是 `"v1.1"`，**Day 18 起 `"v1.2"`**），
-**不放在地址里**（不写 `/v1/habits`）。
+后端版本放在返回体的 `version` 字段里（Day 15 是 `"v1"`，Day 17 起是 `"v1.1"`，Day 18 起 `"v1.2"`，
+**Day 22 起 `"v1.3"`**），**不放在地址里**（不写 `/v1/habits`）。
 
 **这个字段到底是谁的版本**：**是「这个接口遵循的契约版本」**，不是整个后端的版本。
 所以它可能几个接口不一样 —— **今天就是这样**：
 
 | 接口 | 报的版本 | 为什么 |
 | --- | --- | --- |
-| `api-habits`（读 + 写） | **`v1.2`** | 今天给它加了 `POST`，请求/响应都变了 |
+| `api-habits`（读 + 写 + 改 + 删） | **`v1.3`** | 今天给它加了 `PATCH` / `DELETE`，请求/响应都变了 |
 | `api-todos`（只读） | `v1.1` | **本次一个字没改**，没理由动它，也就**没有重新部署** |
 | `api-health` | `v1` | 同上，Day 15 之后没动过 |
 
@@ -663,15 +880,17 @@ https://<环境ID>.service.tcloudbase.com/<功能>[/<资源>][/<资源ID>]
 
 | 不做的事 | 为什么不做 | 什么时候 |
 | --- | --- | --- |
-| 习惯 / 待办的**改动与删除**（`PATCH` / `DELETE`） | 今天只做「新建」这一件事，把它验透；改和删是同一类活，留着一起做 | 第 4 周 |
-| 待办的**写入**（`POST /api/todos`） | 和习惯的写入是同一套做法，先把「习惯」这条路走通 | 第 4 周 |
-| **批量写入** | 单条还没在真环境跑稳之前，批量只会让「出错时是哪一条」更难定位 | 需要时再说 |
-| 登录 / 鉴权 | 本期只有一个用户（`PRD.md` 第 6 节）。**代价要认**：读接口是公开可读的，**Day 18 起 `POST /api/habits` 还是公开可写的** —— 谁知道地址谁就能加习惯 | 未排期 |
+| 习惯的**打卡 / 取消打卡**（勾选） | 改的是 `habit_records` 那张表，不是「改一条习惯」；两件事，分开做 | 第 4 周之后 |
+| 待办的**改与删**（`PATCH`/`DELETE /api/todos/<id>`） | 和习惯的改删是同一套做法，先把习惯这条路走通、验透 | 需要时再说 |
+| 待办的**写入**（`POST /api/todos`） | 同上 | 需要时再说 |
+| **批量写入 / 批量删除** | 单条还没在真环境跑稳之前，批量只会让「出错时是哪一条」更难定位。**今天明确不做** | 需要时再说 |
+| 登录 / 鉴权 | 本期只有一个用户（`PRD.md` 第 6 节）。**代价要认**：读接口是公开可读的，`POST /api/habits` 是公开可写的，**Day 22 起 `PATCH`/`DELETE` 也是公开可改可删的** —— 谁知道地址谁就能增、能改、能删 | 未排期 |
 | 分页、限流、重试 | 数据量极小，现在写等于凭空猜参数（`limit` 只做了上限夹取，没有分页） | 需要时再说 |
 | 多用户 / 云端账号 | 同上 | 未排期 |
 
 > 已经做完、**从这张表里划掉**的：跨域（Day 17，见第 3.7 节）、数据库建表（Day 16）、
-> 真实业务接口的**读**这一半（Day 17）、习惯的**新建**（Day 18，见第 3.8 节）。
+> 真实业务接口的**读**这一半（Day 17）、习惯的**新建**（Day 18，见第 3.8 节）、
+> **习惯的改与删**（Day 22，见第 3.11 / 3.12 节）—— 到这一天，习惯的「增删改查」四类操作**凑齐了**。
 
 ---
 
@@ -682,9 +901,10 @@ https://<环境ID>.service.tcloudbase.com/<功能>[/<资源>][/<资源ID>]
 混在一起会分不清是哪一步错了。
 
 **Day 17 起（现在这样）**：前端**读**走接口，**写**还在本地。
-⚠️ **Day 18 做的是接口，前端一行没改** —— 所以「写还在本地」这条到今天依然成立
-（页面上加的、勾的、删的，刷新之后还是会被数据库那一份盖掉）。把页面的「写」切过去要连
-`PATCH` / `DELETE` 一起接，那在第 4 周。
+⚠️ **Day 18 / Day 22 做的都是接口，前端至今一个字没改** —— 所以「写还在本地」这条到今天依然成立
+（页面上加的、勾的、删的，刷新之后还是会被数据库那一份盖掉）。
+**到今天为止，四类操作的接口已经凑齐了**（读 `GET` / 增 `POST` / 改 `PATCH` / 删 `DELETE`），
+把页面的「写」整体切过去的前置条件**已经具备** —— 那是下一步的事，不是今天。
 
 **「读」的逻辑全部收在一个文件里** ——
 仓库根目录的 **`cloud.js`**（这就是上面那句「接口地址和读法只出现在一个地方」的落点）：
@@ -757,16 +977,38 @@ curl -s "$B/api/todos?date=2026-10-04"     | grep -o '"count":[0-9]*'   # 5
 curl -s "$B/api/todos?date=2026-02-30"     | grep -o '"date":[^,]*'     # null（假日期被识破，降级成不筛）
 
 # 5) 方法用错：该 405
-#    ⚠️ Day 18 起 /api/habits 支持 POST 了，所以这里要换成 PATCH 才测得到 405
-curl -s -o /dev/null -w "%{http_code}\n" -X PATCH "$B/api/habits"     # 405
+#    ⚠️ Day 22 起 /api/habits 也支持 PATCH / DELETE 了 —— 现在要拿 PUT 才测得到 405
+curl -s -o /dev/null -w "%{http_code}\n" -X PUT   "$B/api/habits"     # 405
 curl -s -o /dev/null -w "%{http_code}\n" -X POST  "$B/api/todos"      # 405（待办还没有写接口）
-curl -s -i -X PATCH "$B/api/habits" | grep -i "^allow"                # allow: GET, POST, OPTIONS
+curl -s -i -X PUT "$B/api/habits" | grep -i "^allow"                  # allow: GET, POST, PATCH, DELETE, OPTIONS
 
 # ---------- 写接口（Day 18）----------
 # 6) 正常新建 → 201 + {ok:true, data:{…}}   ★ 这一步会真的往库里加一行 ★
 curl -s -X POST "$B/api/habits" -H 'content-type: application/json' -d '{"name":"睡前不看手机"}'
 #    写完立刻读回（读回验证）→ count 应该比上一步多 1，新习惯在列表里、doneDates 是 []
 curl -s "$B/api/habits" | grep -o '"count":[0-9]*'
+
+# ---------- 改 / 删（Day 22）----------
+ID=h_xxxxxx   # 用第 6 步返回的 data.id（或列表里任意一条）
+
+# 7) 改一条 → 200；改完读回，新值在列表里
+curl -s -X PATCH "$B/api/habits/$ID" -H 'content-type: application/json' -d '{"name":"睡前不看手机（改）"}'
+curl -s "$B/api/habits" | grep -o "睡前不看手机（改）"
+
+# 8) 删一条（默认软删）→ 200 + deleted.mode = soft；删完读回，它**不在**了
+curl -s -X DELETE "$B/api/habits/$ID"
+curl -s "$B/api/habits" | grep -o "$ID"        # 期望：无输出
+
+# 9) 删错了能找回 → 又出现；最后真删干净
+curl -s -X DELETE "$B/api/habits/$ID?restore=true"
+curl -s -X DELETE "$B/api/habits/$ID?hard=true"
+
+# 10) ★ 最关键的护栏：不带 id 的 DELETE 必须被挡下（不许有「删全部」）
+curl -s -o /dev/null -w "%{http_code}\n" -X DELETE "$B/api/habits"    # 期望：405
+curl -s -X DELETE "$B/api/habits"                                     # 看它拦下来的原话
+
+# 11) 改/删一个不存在的 id → 404 not_found（不是静默成功）
+curl -s -X DELETE "$B/api/habits/h_notexist22" | grep -o '"error":"[^"]*"'   # not_found
 
 # 7) 重复提交被拒 → 409 + conflict + 中文
 curl -s -X POST "$B/api/habits" -H 'content-type: application/json' -d '{"name":"睡前不看手机"}'
@@ -814,6 +1056,7 @@ curl -s "https://$ENV-1499798330.tcloudbaseapp.com/cloud.js" | grep -o "api/habi
 | v1.0 | 2026-10-03 | 首版（Day 15 产出）：定下 `GET /api/health` 的请求与响应；定下全项目的数据格式、成功/失败形状、错误码名称、版本策略；列出今天不做的事及各自排期 |
 | v1.1 | 2026-10-04 | Day 17：新增第 3 节，写清 `GET /api/habits`、`GET /api/todos` 两个读接口的请求 / 响应 / 字段表；新增 3.1 节记录「接口要的数据和建的表哪里对不上」（形状 + 命名两处）；新增 3.4 查询参数、3.6 后端怎么读到数据库（三条路实测）、3.7 跨域；第 1 / 4 / 5 / 6 / 7 节按现状改写；版本号从 `v1` 升到 `v1.1` |
 | v1.2 | 2026-10-05 | Day 18：第 3 节改名为「业务接口」（读 Day 17 / 写 Day 18），**新增 3.8 `POST /api/habits` 完整定义**（请求字段表 + `201` 响应示例 + 13 种出错情况的中文提示）；**新增 3.9 防重复提交的两层设计**（应用层查重只负责说人话，数据库唯一索引才真的防住并发）与三条可重跑的测法；**新增 3.10 服务端日志**字段说明；第 4.3 / 4.4 / 4.5 节更新（`data` 可以是对象、新增错误码 `conflict`(409)、`bad_request` 第一次真正用上、说清 `version` 是**每个接口各自**的契约版本，所以 `api-todos` 仍报 `v1.1`）；第 1 / 3.7 / 5 / 6 / 7 节按现状改写；**没有新增章节、也没挪动原有节号**（免得代码注释里的「第 4.2 节」全部失效）|
+| v1.3 | 2026-10-09 | Day 22：第 1 节把范围从「四个接口」改成「六个动作」；**新增 3.11 `PATCH /api/habits/<id>`（改一条）**、**3.12 `DELETE /api/habits/<id>`（删一条，默认软删除 + `?restore=true` 可找回）**、**3.13「删除为什么比新增更容易出事 + 我在三处加了确认」**（含软删除实现表、`is_deleted` 与部分唯一索引的取舍、四类闭环复现命令）；3.5 / 3.7 / 3.8 / 3.10 / 4.1 / 4.4 / 4.5 / 5 / 6 / 7 节按现状改写（`not_found`(404) 第一次真正用上、`allow` 头与 CORS 方法表加 `PATCH`/`DELETE`、`version` 升 `v1.3`、第 4.1 节那条「单条资源还没做」划掉）；**新增一条实测笔记**：CloudBase HTTP 访问服务是**路径前缀匹配 + 剥掉前缀**（函数收到的 `event.path` 是 `/h_xxx`，不是 `/api/habits/h_xxx`）|
 
 ---
 

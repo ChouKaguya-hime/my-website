@@ -1,13 +1,20 @@
 -- =============================================================================
--- db/schema.sql ｜ 习惯规划板 · 数据库表结构（Day 16 产出，Day 18 追加一条唯一索引）
+-- db/schema.sql ｜ 习惯规划板 · 数据库表结构（Day 16 产出，Day 18 加唯一索引，Day 22 加软删除）
 -- =============================================================================
 -- 目标环境：CloudBase PostgreSQL（实测 PostgreSQL 17.11）
 -- 上游依据：PRD.md 第 6.1 节（存什么，字段不增不减）、api-contract.md 第 3.2 节（JSON 字段用小驼峰）
 -- 执行方式：tcb db execute -e <envId> --sql "$(cat db/schema.sql)"
--- 幂等性：全部用 CREATE TABLE / CREATE INDEX IF NOT EXISTS，重复执行不报错、不改动已有表。
+-- 幂等性：全部用 CREATE TABLE / CREATE INDEX IF NOT EXISTS / ADD COLUMN IF NOT EXISTS，
+--   重复执行不报错、不改动已有表。Day 22 的索引调整是「先 DROP IF EXISTS 再建」，同样可反复执行。
 --
 -- 【Day 18 改了什么】只在 habits 上加了 ux_habits_name 这一条唯一索引（同名的习惯只留一条），
 --   三张表的结构、列、其余约束一个字没动。原因见那条索引上方的注释。
+--
+-- 【Day 22 改了什么】给 habits 加了 is_deleted 列（软删除标记），并把唯一索引缩小成
+--   「只对没被删的记录生效」。**没有新增表、没有动 habit_records / todos** ——
+--   删除能力只落在 habits 这一张表上。
+--   为什么软删除：删除是四类操作里**唯一一个会丢数据**的 —— 加错了能删、改错了能改回，
+--   只有删错了不可逆。加一个标记位代替真删，删错了还能找回（见 api-contract.md 第 3.10 节）。
 
 --
 -- ── 今天要回答的那个问题 ──────────────────────────────────────────────────────
@@ -31,17 +38,34 @@ CREATE TABLE IF NOT EXISTS habits (
   freq_type   VARCHAR(8)   NOT NULL DEFAULT 'daily',          -- 频率类型：daily=每天 / weekly=每周 N 次（对应前端 freqType）
   freq_count  SMALLINT     NOT NULL DEFAULT 7,                -- 每周次数，仅 weekly 有效（对应前端 freqCount）
   created_at  DATE         NOT NULL DEFAULT CURRENT_DATE,     -- 创建日期 YYYY-MM-DD（对应前端 createdAt）
+  is_deleted  BOOLEAN      NOT NULL DEFAULT false,            -- ★ Day 22 追加：软删除标记（true=已删，读时跳过，能找回）
   CONSTRAINT habits_freq_type_chk CHECK (freq_type IN ('daily', 'weekly')),
   CONSTRAINT habits_freq_count_chk CHECK (freq_count BETWEEN 1 AND 7)
 );
 
--- ★ Day 18 追加：同一个名字的习惯只能有一条 ★
+-- ★ Day 22 追加：给**已经建好的老表**补上 is_deleted 这一列（新表上面的 CREATE TABLE 里已经带了）★
+-- 为什么还要这一句：CREATE TABLE IF NOT EXISTS 对已存在的表**整段跳过**，不会帮你加列 ——
+--   老环境（本项目的库就是）已经有 habits 了，所以必须靠 ALTER 补。
+-- 为什么是 NOT NULL DEFAULT false：老数据全是「没删过」的，默认值正好；
+--   NOT NULL + 有默认值 = PostgreSQL 加列时不回填、不锁长事务，6 条老数据自动就是 false。
+-- 为什么用 IF NOT EXISTS：这个脚本要能反复执行，第二次跑必须安静地跳过。
+ALTER TABLE habits ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
+
+-- ★ Day 18 追加、Day 22 调整：同一个名字的习惯只能有一条（**限未被软删的那些**）★
 -- 为什么要有它（而不是只在云函数里「先查一遍再插」）：
 --   云函数里的查重是「先看一眼、再写」——两个请求几乎同时到达时，
 --   它们会同时看到「这个名字还没人用」，然后各插一条，查重就漏了（双击提交 / 网络重试正是这种情况）。
 --   唯一索引由数据库自己保证：第二条不管怎么并发都插不进去。
 --   → 两层分工：应用层负责给「已经有一个叫「X」的习惯了」这句人话；数据库层负责让重复真的进不来。
-CREATE UNIQUE INDEX IF NOT EXISTS ux_habits_name ON habits (name);
+--
+-- ⚠️ Day 22 为什么要从「全表唯一」改成「部分唯一（WHERE is_deleted = false）」：
+--   加了软删除之后，如果还按全表唯一，会卡死在这个场景 ——
+--     删掉「每天喝 8 杯水」（软删，行还留在表里）→ 用户想重新建一个同名的 →
+--     唯一索引认出「这名字已被占」，第二条插不进去 —— **可界面上它明明已经不存在了**。
+--   所以唯一性只该约束「还没被删的」：已软删的记录把名字**让出来**。
+-- 幂等做法：先 DROP（存在就删、不存在就跳过），再按新定义重建 —— 反复执行结果都一样。
+DROP INDEX IF EXISTS ux_habits_name;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_habits_name ON habits (name) WHERE is_deleted = false;
 
 COMMENT ON TABLE  habits             IS '习惯定义表（PRD 6.1 习惯 habit）——只存习惯本身，不含完成记录';
 COMMENT ON COLUMN habits.id          IS '习惯唯一标识，前端生成，形如 h_ + 时间戳36进制 + 随机串';
@@ -49,6 +73,7 @@ COMMENT ON COLUMN habits.name        IS '习惯名称，如「每天喝 8 杯水
 COMMENT ON COLUMN habits.freq_type   IS '频率类型：daily=每天一次 / weekly=每周 N 次';
 COMMENT ON COLUMN habits.freq_count  IS '每周目标次数，仅 freq_type=weekly 时有意义；daily 固定存 7（沿用前端默认值）';
 COMMENT ON COLUMN habits.created_at  IS '创建日期（只有年月日，无时分秒），默认取当天';
+COMMENT ON COLUMN habits.is_deleted  IS '★ Day 22：软删除标记。true=已被删除（读接口会跳过它，但数据还在，加 ?restore=true 能找回）；false=正常';
 
 
 -- -----------------------------------------------------------------------------
