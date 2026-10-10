@@ -83,6 +83,47 @@ const LIMIT_MAX = 200;
 const NAME_MAX = 50;
 
 /**
+ * ★ Day 23：三类错误提示统一（① 400 参数错 ② 404 找不到 ③ 500 服务端错）
+ *
+ * 规矩只有一条：**响应体里给用户看的 `message`，一律是中文人话。**
+ *   · 400 参数错 —— 说清「你这次请求哪里不对、怎么改」（例如「习惯名称不能是空的」）
+ *   · 404 找不到 —— 说清「没找到什么、它可能怎么了」（例如「没有找到 id 为「h_x」的习惯」）
+ *   · 500 服务端错 —— 只说「服务器的问题、过会儿再试」，**绝不把数据库原文 / 异常信息丢给用户**
+ *
+ * ⚠️ 今天把 500 里那句「裸报错」改成了人话（本日要掌握的那一问）：
+ *     改前：'读取习惯失败：' + e.message        ← 用户会看到一长串英文 / 内部报错
+ *     改后：MSG.serverRead                       ← 一句中文，还说明了「不是你操作的问题」
+ *   原始报错**没有丢** —— 它进了**服务端日志**（logRequest 的 error 字段）。
+ *   排查时拿 requestId 去函数日志里搜那一行，就能看到真正的报错。
+ *   为什么这么改：① 给用户看天书＝没帮上忙；② 把内部报错摊在响应里，等于把库结构 / 连接细节
+ *   告诉任何人（这个接口在公网上、还不需要鉴权）。
+ */
+const MSG = {
+  serverRead: '服务器暂时出了点问题，读取没成功，请过一会儿再试（不是你操作的问题）',
+  serverWrite: '服务器暂时出了点问题，保存没成功，请过一会儿再试（不是你操作的问题）',
+  serverUpdate: '服务器暂时出了点问题，修改没成功，请过一会儿再试（不是你操作的问题）',
+  serverDelete: '服务器暂时出了点问题，删除没成功，请过一会儿再试（不是你操作的问题）',
+  serverRestore: '服务器暂时出了点问题，恢复没成功，请过一会儿再试（不是你操作的问题）',
+};
+
+/** ★ Day 23：把 typeof 的结果翻成中文 —— 免得 400 的提示里冒出 number / object 这种英文内部词 */
+function typeName(v) {
+  if (v === null) return '空值（null）';
+  if (Array.isArray(v)) return '数组';
+  const t = typeof v;
+  return (
+    {
+      string: '文本',
+      number: '数字',
+      boolean: '真 / 假',
+      object: '对象',
+      undefined: '空（没传）',
+      function: '函数',
+    }[t] || t
+  );
+}
+
+/**
  * 统一出口：状态码 / 响应头 / JSON 体
  *
  * 跨域（CORS）Day 17 起配 —— 页面在 xxx.tcloudbaseapp.com、接口在 xxx.app.tcloudbase.com，
@@ -255,7 +296,7 @@ function validateHabitInput(input) {
     return { ok: false, message: '缺少必填字段 name（习惯名称）' };
   }
   if (typeof input.name !== 'string') {
-    return { ok: false, message: 'name 要是字符串（习惯名称），现在收到的是 ' + typeof input.name };
+    return { ok: false, message: 'name 要是字符串（习惯名称），现在收到的是 ' + typeName(input.name) };
   }
   const name = input.name.trim();
   if (!name) {
@@ -325,7 +366,7 @@ function validateHabitPatch(input) {
 
   if (input.name !== undefined) {
     if (typeof input.name !== 'string') {
-      return { ok: false, message: 'name 要是字符串（习惯名称），现在收到的是 ' + typeof input.name };
+      return { ok: false, message: 'name 要是字符串（习惯名称），现在收到的是 ' + typeName(input.name) };
     }
     const name = input.name.trim();
     if (!name) return { ok: false, message: '习惯名称不能是空的' };
@@ -467,7 +508,7 @@ exports.main = async (event, context) => {
         { outcome: 'read_ok', count: data.length }
       );
     } catch (e) {
-      return done(fail(500, 'server_error', '读取习惯失败：' + ((e && e.message) || String(e))), {
+      return done(fail(500, 'server_error', MSG.serverRead), {
         outcome: 'read_failed',
         error: (e && e.message) || String(e),
       });
@@ -544,7 +585,7 @@ exports.main = async (event, context) => {
 
       if (res.status < 200 || res.status >= 300) {
         return done(
-          fail(500, 'server_error', '写入习惯失败：数据库返回 ' + res.status + '：' + String(res.text).slice(0, 300)),
+          fail(500, 'server_error', MSG.serverWrite),
           { outcome: 'write_failed', error: String(res.text).slice(0, 200) }
         );
       }
@@ -583,7 +624,7 @@ exports.main = async (event, context) => {
       );
     } catch (e) {
       return done(
-        fail(500, 'server_error', '写入习惯失败：' + ((e && e.message) || String(e))),
+        fail(500, 'server_error', MSG.serverWrite),
         { outcome: 'write_failed', error: (e && e.message) || String(e) }
       );
     }
@@ -617,7 +658,7 @@ exports.main = async (event, context) => {
     try {
       existing = await db.findHabitById(id);
     } catch (e) {
-      return done(fail(500, 'server_error', '读取习惯失败：' + ((e && e.message) || String(e))), {
+      return done(fail(500, 'server_error', MSG.serverRead), {
         outcome: 'read_failed',
         error: (e && e.message) || String(e),
       });
@@ -682,7 +723,7 @@ exports.main = async (event, context) => {
       }
       if (res.status < 200 || res.status >= 300) {
         return done(
-          fail(500, 'server_error', '修改习惯失败：数据库返回 ' + res.status + '：' + String(res.text).slice(0, 300)),
+          fail(500, 'server_error', MSG.serverUpdate),
           { outcome: 'update_failed', error: String(res.text).slice(0, 200) }
         );
       }
@@ -731,7 +772,7 @@ exports.main = async (event, context) => {
       );
     } catch (e) {
       return done(
-        fail(500, 'server_error', '修改习惯失败：' + ((e && e.message) || String(e))),
+        fail(500, 'server_error', MSG.serverUpdate),
         { outcome: 'update_failed', error: (e && e.message) || String(e) }
       );
     }
@@ -773,7 +814,7 @@ exports.main = async (event, context) => {
     try {
       existing = await db.findHabitById(id);
     } catch (e) {
-      return done(fail(500, 'server_error', '读取习惯失败：' + ((e && e.message) || String(e))), {
+      return done(fail(500, 'server_error', MSG.serverRead), {
         outcome: 'read_failed',
         error: (e && e.message) || String(e),
       });
@@ -797,7 +838,7 @@ exports.main = async (event, context) => {
         const res = await db.restoreHabit(id);
         if (res.status < 200 || res.status >= 300) {
           return done(
-            fail(500, 'server_error', '恢复习惯失败：数据库返回 ' + res.status + '：' + String(res.text).slice(0, 300)),
+            fail(500, 'server_error', MSG.serverRestore),
             { outcome: 'restore_failed', error: String(res.text).slice(0, 200) }
           );
         }
@@ -816,7 +857,7 @@ exports.main = async (event, context) => {
         );
       } catch (e) {
         return done(
-          fail(500, 'server_error', '恢复习惯失败：' + ((e && e.message) || String(e))),
+          fail(500, 'server_error', MSG.serverRestore),
           { outcome: 'restore_failed', error: (e && e.message) || String(e) }
         );
       }
@@ -847,7 +888,7 @@ exports.main = async (event, context) => {
       const res = await db.deleteHabit(id, hard);
       if (res.status < 200 || res.status >= 300) {
         return done(
-          fail(500, 'server_error', '删除习惯失败：数据库返回 ' + res.status + '：' + String(res.text).slice(0, 300)),
+          fail(500, 'server_error', MSG.serverDelete),
           { outcome: 'delete_failed', error: String(res.text).slice(0, 200) }
         );
       }
@@ -878,7 +919,7 @@ exports.main = async (event, context) => {
       );
     } catch (e) {
       return done(
-        fail(500, 'server_error', '删除习惯失败：' + ((e && e.message) || String(e))),
+        fail(500, 'server_error', MSG.serverDelete),
         { outcome: 'delete_failed', error: (e && e.message) || String(e) }
       );
     }

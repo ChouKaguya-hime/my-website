@@ -30,6 +30,42 @@ const FUNC_NAME = 'api-todos';
 // ⚠️ Day 19 只重构了内部实现，**接口契约一个字没动** —— 所以版本号不升，还是 v1.1。
 const CONTRACT_VERSION = 'v1.1';
 
+/**
+ * ★ Day 23：三类错误提示统一（① 400 参数错 ② 404 找不到 ③ 500 服务端错）——
+ * 这条规矩和 api-habits 用的是**同一套口径**：给用户看的 `message` 一律中文人话；
+ * 原始报错（数据库原文 / 异常信息）只进**服务端日志**，不放响应体。
+ *   改前：'读取待办失败：' + e.message   ← 用户看到一长串英文 / 内部报错
+ *   改后：MSG.serverRead                 ← 一句中文，还说明了「不是你操作的问题」
+ */
+const MSG = {
+  serverRead: '服务器暂时出了点问题，读取没成功，请过一会儿再试（不是你操作的问题）',
+};
+
+/**
+ * ★ Day 23（余力加练）：一条请求日志 —— 时间 / 函数 / 方法 / 路径 / 结果 / 耗时。
+ * 为什么要它：500 的响应体已经只说人话，原始报错只能靠这条日志找回（配 requestId 搜）。
+ * 日志本身绝不能影响接口：出任何问题都吞掉。
+ */
+function logRequest(entry) {
+  try {
+    console.log(
+      JSON.stringify(
+        Object.assign(
+          {
+            at: new Date().toISOString(),
+            service: SERVICE,
+            function: FUNC_NAME,
+            version: CONTRACT_VERSION,
+          },
+          entry
+        )
+      )
+    );
+  } catch (e) {
+    /* 打不出日志也不能让接口挂掉 */
+  }
+}
+
 // ★ 数据访问层（Day 19 从本文件拆出去的）：查数据库的活全在 db.js 里。
 const db = require('./db');
 
@@ -90,10 +126,30 @@ function query(event) {
 }
 
 exports.main = async (event, context) => {
+  const t0 = Date.now();
   const method = String((event && (event.httpMethod || event.http_method)) || 'GET').toUpperCase();
+  const path = (event && (event.path || event.rawPath)) || '';
 
-  if (method === 'OPTIONS') return reply(204, null);
-  if (method !== 'GET') return fail(405, 'method_not_allowed', '这个接口只接受 GET');
+  /** ★ Day 23（余力加练）：每条出口都留一行日志（打日志 + 返回，一次搞定） */
+  function done(res, extra) {
+    logRequest(
+      Object.assign(
+        {
+          method: method,
+          path: path,
+          status: res.statusCode,
+          ms: Date.now() - t0,
+        },
+        extra || {}
+      )
+    );
+    return res;
+  }
+
+  if (method === 'OPTIONS') return done(reply(204, null), { outcome: 'preflight' });
+  if (method !== 'GET') {
+    return done(fail(405, 'method_not_allowed', '这个接口只接受 GET'), { outcome: 'method_not_allowed' });
+  }
 
   try {
     const q = query(event);
@@ -112,18 +168,25 @@ exports.main = async (event, context) => {
       };
     });
 
-    return reply(200, {
-      ok: true,
-      service: SERVICE,
-      function: FUNC_NAME,
-      version: CONTRACT_VERSION,
-      envId: ENV_ID,
-      count: data.length,
-      date: date, // null 表示「没有按日期筛，返回的是全部」
-      generatedAt: new Date().toISOString(),
-      data: data,
-    });
+    return done(
+      reply(200, {
+        ok: true,
+        service: SERVICE,
+        function: FUNC_NAME,
+        version: CONTRACT_VERSION,
+        envId: ENV_ID,
+        count: data.length,
+        date: date, // null 表示「没有按日期筛，返回的是全部」
+        generatedAt: new Date().toISOString(),
+        data: data,
+      }),
+      { outcome: 'read_ok', count: data.length }
+    );
   } catch (e) {
-    return fail(500, 'server_error', '读取待办失败：' + ((e && e.message) || String(e)));
+    // ★ Day 23：只说人话 —— 原始报错进日志（done 的 extra.error），不进响应体
+    return done(fail(500, 'server_error', MSG.serverRead), {
+      outcome: 'read_failed',
+      error: (e && e.message) || String(e),
+    });
   }
 };
