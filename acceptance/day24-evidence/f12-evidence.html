@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Day 24 · F12 定位实录</title>
+<style>
+  body { font: 15px/1.7 "Microsoft YaHei", system-ui, sans-serif; margin: 0; padding: 22px 26px; background: #faf9f6; color: #24292f; }
+  h1 { font-size: 19px; margin: 0 0 4px; }
+  .sub { color: #6b6b6b; font-size: 12.5px; margin-bottom: 16px; }
+  .row { border: 1px solid #e3e0d8; background: #fff; border-radius: 8px; padding: 11px 15px; margin-bottom: 11px; }
+  .q { font-family: Consolas, monospace; font-size: 13px; font-weight: 700; margin-bottom: 7px; word-break: break-all; }
+  .q .note { font-weight: 400; color: #888; }
+  .a { font-family: Consolas, monospace; font-size: 13.5px; padding: 4px 9px; border-radius: 5px; display: inline-block; }
+  .bad { background: #fdecec; color: #b3261e; font-weight: 700; }
+  .ok  { background: #e9f6ec; color: #1a7f37; font-weight: 700; }
+  .msg { font-size: 13px; margin-top: 7px; color: #444; font-family: Consolas, monospace; }
+  .hint { margin-top: 16px; padding: 10px 14px; background: #fff8e5; border-left: 4px solid #d4a017; font-size: 13px; color: #6b5300; }
+  .console { margin-top: 14px; border: 1px solid #d8d5cd; border-radius: 8px; overflow: hidden; }
+  .console .bar { background: #efece5; padding: 5px 12px; font-size: 12px; color: #555; border-bottom: 1px solid #d8d5cd; }
+  .console .body { background: #fff; padding: 9px 13px; font-family: Consolas, monospace; font-size: 12.5px; }
+  .console .err { color: #b3261e; }
+</style>
+</head>
+<body>
+  <h1>Day 24 · 定位实录：这几条写请求，服务端当场是怎么答的</h1>
+  <div class="sub">下面三条不是编的 —— 页面一打开就会真的发出去，结果由服务端当场返回（Patch 用的是「当前值」，不会改动任何数据）。</div>
+
+  <div class="row">
+    <div class="q">POST /api/todos <span class="note">←「加待办」要走的那个口</span></div>
+    <div class="a bad" id="a1">…</div>
+    <div class="msg" id="m1"></div>
+  </div>
+
+  <div class="row">
+    <div class="q">PATCH /api/habits/&lt;id&gt;　body {"doneDates":[…]} <span class="note">←「勾选完成」要走的那个口</span></div>
+    <div class="a bad" id="a2">…</div>
+    <div class="msg" id="m2"></div>
+  </div>
+
+  <div class="row">
+    <div class="q">PATCH /api/habits/&lt;id&gt;　body {"name":…} <span class="note">← 对照组：写口本身是好的</span></div>
+    <div class="a ok" id="a3">…</div>
+    <div class="msg" id="m3"></div>
+  </div>
+
+  <div class="hint">按 <b>F12</b> → 切到 <b>Console</b>：前两条会各留一行红色报错（405 / 400）—— 就是它们把真因指了出来。</div>
+
+  <div class="console">
+    <div class="bar">Console（这个页面上真实产生的两行）</div>
+    <div class="body" id="consoleBody">（打开后自动填入）</div>
+  </div>
+
+<script>
+var BASE = 'https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com';
+var lines = [];
+
+function set(id, txt) { document.getElementById(id).textContent = txt; }
+
+(async function () {
+  // ① 加待办要走的那个口
+  try {
+    var r1 = await fetch(BASE + '/api/todos', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'Day24 定位探针（不该被写进去）' })
+    });
+    var j1 = await r1.json();
+    set('a1', 'HTTP ' + r1.status + ' ' + r1.statusText);
+    set('m1', '服务端说：' + (j1.message || JSON.stringify(j1)));
+    if (!r1.ok) lines.push('Failed to load resource: the server responded with a status of ' + r1.status + ' (' + r1.statusText + ')');
+  } catch (e) { set('m1', '失败：' + e.message); }
+
+  // ② 勾选完成要走的那个口（带 doneDates，值 = 当前值，绝不改数据）
+  try {
+    var rh = await fetch(BASE + '/api/habits');
+    var jh = await rh.json();
+    var h = jh.data[0];
+
+    var r2 = await fetch(BASE + '/api/habits/' + encodeURIComponent(h.id), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ doneDates: h.doneDates })
+    });
+    var j2 = await r2.json();
+    set('a2', 'HTTP ' + r2.status + ' ' + r2.statusText);
+    set('m2', '服务端说：' + (j2.message || JSON.stringify(j2)));
+    if (!r2.ok) lines.push('Failed to load resource: the server responded with a status of ' + r2.status + ' (' + r2.statusText + ')');
+
+    // ③ 对照组
+    var r3 = await fetch(BASE + '/api/habits/' + encodeURIComponent(h.id), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: h.name })
+    });
+    var j3 = await r3.json();
+    set('a3', 'HTTP ' + r3.status + ' ' + r3.statusText);
+    set('m3', '服务端说：ok=' + j3.ok);
+  } catch (e) { set('m2', '失败：' + e.message); }
+
+  var box = document.getElementById('consoleBody');
+  box.innerHTML = lines.length
+    ? lines.map(function (t) { return '<div class="err">✕ ' + t + '</div>'; }).join('')
+    : '（没有报错）';
+})();
+</script>
+</body>
+</html>
