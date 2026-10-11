@@ -1,0 +1,81 @@
+选中页面 = http://127.0.0.1:8903/index.html
+  → {"习惯数":6,"有N1":false,"有N2":false,"卡片数":6,"页面上有N1":false,"页面上有N2":false,"数据来源":"云端数据库"}
+  → {"习惯数":7,"有N1":true,"有N2":false,"卡片数":7,"页面上有N1":true,"页面上有N2":false,"数据来源":"云端数据库"}
+  → {"习惯数":7,"有N1":true,"有N2":false,"卡片数":7,"页面上有N1":true,"页面上有N2":false,"数据来源":"云端数据库"}
+  ★ 刷新后还在吗 = 在（写回库成功）
+  → {"习惯数":7,"有N1":false,"有N2":true,"卡片数":7,"页面上有N1":false,"页面上有N2":true,"数据来源":"云端数据库"}
+  → {"习惯数":7,"有N1":false,"有N2":true,"卡片数":7,"页面上有N1":false,"页面上有N2":true,"数据来源":"云端数据库"}
+  ★ 改的名字保持住了吗 = 保持住了（PATCH 成功）
+  → {"习惯数":6,"有N1":false,"有N2":false,"卡片数":6,"页面上有N1":false,"页面上有N2":false,"数据来源":"云端数据库"}
+  → {"习惯数":6,"有N1":false,"有N2":false,"卡片数":6,"页面上有N1":false,"页面上有N2":false,"数据来源":"云端数据库"}
+  ★ 删掉的没复活吗 = 没复活（DELETE 成功）
+
+兜底清理（库里本来还剩的验证数据）= []
+
+================ 步骤0 干净加载 ================
+  [Network] 写请求 1 条：
+    POST https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com/api/habits
+  [Network] 接口回应 1 条：
+    201  <BASE>/api/habits
+  [Console] error/warn 1 条：
+    [error] Failed to load resource: the server responded with a status of 404 (File not found)
+  [异常] 0 条：无
+
+================ 步骤1 新建习惯「__Day24验证__」 ================
+  [Network] 写请求 0 条：
+  [Network] 接口回应 2 条：
+    200  <BASE>/api/habits
+    200  <BASE>/api/todos
+  [Network] 失败 1 条：
+    x http://127.0.0.1:8903/assets/bgm-starfall-sea.ogg  net::ERR_ABORTED
+  [Console] error/warn 0 条：
+  [异常] 0 条：无
+
+================ 步骤2 刷新 ================
+  [Network] 写请求 1 条：
+    PATCH https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com/api/habits/h_mv3y731nbn1et
+  [Network] 接口回应 1 条：
+    200  <BASE>/api/habits/h_mv3y731nbn1et
+  [Console] error/warn 1 条：
+    [error] Failed to load resource: the server responded with a status of 404 (File not found)
+  [异常] 0 条：无
+
+================ 步骤3 编辑成「__Day24验证_改过名__」 ================
+  [Network] 写请求 0 条：
+  [Network] 接口回应 2 条：
+    200  <BASE>/api/todos
+    200  <BASE>/api/habits
+  [Network] 失败 1 条：
+    x http://127.0.0.1:8903/assets/bgm-starfall-sea.ogg  net::ERR_ABORTED
+  [Console] error/warn 0 条：
+  [异常] 0 条：无
+
+================ 步骤4 刷新 ================
+  [Network] 写请求 1 条：
+    DELETE https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com/api/habits/h_mv3y731nbn1et
+  [Network] 接口回应 1 条：
+    200  <BASE>/api/habits/h_mv3y731nbn1et
+  [Console] error/warn 1 条：
+    [error] Failed to load resource: the server responded with a status of 404 (File not found)
+  [异常] 0 条：无
+
+================ 步骤5 删除 ================
+  [Network] 写请求 0 条：
+  [Network] 接口回应 2 条：
+    200  <BASE>/api/habits
+    200  <BASE>/api/todos
+  [Network] 失败 1 条：
+    x http://127.0.0.1:8903/assets/bgm-starfall-sea.ogg  net::ERR_ABORTED
+  [Console] error/warn 0 条：
+  [异常] 0 条：无
+
+================ 步骤6 刷新 ================
+  [Network] 写请求 0 条：
+  [Network] 接口回应 1 条：
+    200  <BASE>/api/habits
+  [Console] error/warn 0 条：
+  [异常] 0 条：无
+
+SUMMARY {"写请求":["POST habits","PATCH habits/h_mv3y731nbn1et","DELETE habits/h_mv3y731nbn1et"],"写请求回应":["200 habits/h_mv3y731nbn1et","200 habits/h_mv3y731nbn1et"],"consoleError":3,"consoleWarn":0,"pageError":0,"failed":3,"最终库里残留验证数据":0}
+
+EDGE_CLOSED by=graceful port_listening=None

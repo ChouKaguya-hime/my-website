@@ -68,6 +68,53 @@
     });
   }
 
+  /**
+   * ★ Day 24 新增：带超时的**写**请求（POST / PATCH / DELETE）。
+   *
+   * 为什么要有它：Day 17 只把「读」接上了，页面上的新建 / 改 / 删一直只写浏览器本机 ——
+   * 而页面一打开，云端那份又会把本机覆盖掉，于是「在页面上做的改动，刷新就白做」。
+   * 今天把「写」补上，服务端那几个口（§3.8 / §3.11 / §3.12）从 Day 18 / Day 22 就备着。
+   *
+   * 返回值统一成一个形状，调用方不用管 HTTP 那套：
+   *   { ok: boolean, status: number, data: object|null, message: string, netError?: string }
+   *   · ok      —— **只看响应体里的 ok 字段**（契约 §4.3），不靠状态码猜
+   *   · message —— 服务端给的人话（Day 23 起一律中文），失败时直接能拿去给用户看
+   *   · netError—— 请求根本没发出去（断网 / 被拦）时的原因
+   */
+  function sendJson(method, url, body) {
+    var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, TIMEOUT_MS);
+
+    var opt = { method: method, signal: ctrl ? ctrl.signal : undefined };
+    if (body !== undefined && body !== null) {
+      opt.headers = { 'content-type': 'application/json; charset=utf-8' };
+      opt.body = JSON.stringify(body);
+    }
+
+    return fetch(url, opt)
+      .then(function (res) {
+        clearTimeout(timer);
+        return res.json()
+          .then(function (json) {
+            return {
+              ok: !!(json && json.ok === true),
+              status: res.status,
+              data: (json && json.data) || null,
+              message: (json && json.message) || '',
+              error: (json && json.error) || ''
+            };
+          })
+          .catch(function () {
+            /* 回应不是 JSON（网关的中间页、HTML 错误页）—— 一样当失败，但不崩 */
+            return { ok: false, status: res.status, data: null, message: '回应不是 JSON（HTTP ' + res.status + '）' };
+          });
+      })
+      .catch(function (e) {
+        clearTimeout(timer);
+        return { ok: false, status: 0, data: null, message: '', netError: String((e && e.message) || e) };
+      });
+  }
+
   /** 右上角那个小标：告诉看页面的人「你现在看到的这份数据是从哪来的」 */
   function paintSource(source) {
     var el = document.getElementById('data-source');
@@ -113,6 +160,36 @@
     loadedAtText: loadedAtText,
 
     load: load,
+
+    /* ★ Day 24：三个「写」方法。接口地址和用法只在这个文件里出现（契约 §6 那条规矩）——
+       以后地址变了、字段改了，只动这里，app.js / dashboard.js 一行都不用碰。 */
+
+    /**
+     * 新建习惯。传 {name, freqType, freqCount}。
+     * **故意不传 id**：契约 §3.8 推荐让服务端生成 —— 两个客户端才不会撞上同一个 id。
+     * 成功时 res.data 就是新建好的那条（形状和列表里的元素完全一样），调用方拿它替换本机那条。
+     */
+    createHabit: function (h) {
+      return sendJson('POST', API.habits, {
+        name: h.name,
+        freqType: h.freqType,
+        freqCount: h.freqCount
+      });
+    },
+
+    /**
+     * 改一条习惯。patch 里只放要改的字段。
+     * ⚠️ 白名单只有 name / freqType / freqCount —— 契约 §3.11：
+     *    `doneDates`（完成记录）不在里面，所以「勾选完成」写不回去（今天的「不做清单」里记着）。
+     */
+    updateHabit: function (id, patch) {
+      return sendJson('PATCH', API.habits + '/' + encodeURIComponent(id), patch);
+    },
+
+    /** 删一条习惯。服务端默认走**软删**（能找回，契约 §3.12）—— 前端不需要区别对待 */
+    removeHabit: function (id) {
+      return sendJson('DELETE', API.habits + '/' + encodeURIComponent(id));
+    },
 
     /**
      * 读到云端数据就替换进页面状态并重画。

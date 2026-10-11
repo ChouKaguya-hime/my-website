@@ -309,8 +309,11 @@ body::after {
 .filter-btn.is-on:hover { background: #7f3d11; border-color: #7f3d11; }
 .habit-card:has(:focus-visible) { border-color: var(--accent); }
 
-/* 卡片上的悬停底色也偏暖一点（原来是冷白 #fafaf8） */
-.habit-row:hover,
+/*
+ * 行的悬停底色也偏暖一点（原来是冷白 #fafaf8）。
+ * ⚠️ Day 24：今日页的习惯从「一行行」改成了卡片（.habit-row → .habit-card），
+ *    .habit-row 这个类在页面上已经没有了，所以选择器里那一条一并去掉。
+ */
 .todo-row:hover { background: rgba(255, 248, 240, 0.9); }
 
 /* 圆角跟着 --radius 一起大一号，观感更软 */

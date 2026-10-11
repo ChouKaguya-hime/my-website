@@ -1,0 +1,58 @@
+选中页面 = http://127.0.0.1:8903/index.html
+  → {"source":"cloud","error":null,"habits":6,"todos":6,"cards":0,"dataSource":"云端数据库","ls":1461}
+  → {"todos":["买牛奶","把 Day 16 的表结构画成一张图，讲清楚两张核心表怎么关联","给 seed.sql 补一条「重复执行」自检，确认不重复插","把 CloudBase 控制台的表数据页截图交给助教","复习外键和外键级联、唯一约束的区别","Day 17 收工：两个读接口已上公网（GET /api/habits、/api/todos）","把 PRD 6.1 的字段表跟数据库列名对一遍"],"条数":7,"页面上有这条":true}
+  → {"第一个习惯":"每天喝 8 杯水","doneDates":["2026-10-04","2026-10-03","2026-10-02","2026-10-01","2026-09-30","2026-09-28","2026-10-11"],"今天勾上了":true}
+  → {"source":"cloud","todos":["把 Day 16 的表结构画成一张图，讲清楚两张核心表怎么关联","给 seed.sql 补一条「重复执行」自检，确认不重复插","把 CloudBase 控制台的表数据页截图交给助教","复习外键和外键级联、唯一约束的区别","Day 17 收工：两个读接口已上公网（GET /api/habits、/api/todos）","把 PRD 6.1 的字段表跟数据库列名对一遍"],"条数":6,"买牛奶还在吗":false,"第一个习惯今天勾上了吗":false}
+
+================ 步骤1 干净加载 ================
+  [Network] 请求 0 条：
+  [Network] 回应 0 条：
+  [Console] 1 条：
+    [error] Failed to load resource: the server responded with a status of 404 (File not found)
+  [异常] 0 条：
+
+================ 步骤2 加一条待办 ================
+  [Network] 请求 0 条：
+  [Network] 回应 0 条：
+  [Console] 0 条：
+  [异常] 0 条：
+
+================ 步骤3 勾选一个习惯 ================
+  [Network] 请求 11 条：
+    GET document   http://127.0.0.1:8903/index.html
+    GET stylesheet http://127.0.0.1:8903/style.css
+    GET stylesheet http://127.0.0.1:8903/theme.css
+    GET script     http://127.0.0.1:8903/cloud.js
+    GET script     http://127.0.0.1:8903/app.js
+    GET script     http://127.0.0.1:8903/theme.js
+    GET fetch      https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com/api/habits
+    GET fetch      https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com/api/todos
+    GET image      http://127.0.0.1:8903/assets/bg-night-trio.jpg
+    GET media      http://127.0.0.1:8903/assets/bgm-starfall-sea.ogg
+    GET media      http://127.0.0.1:8903/assets/bgm-starfall-sea.ogg
+  [Network] 回应 11 条：
+    200  http://127.0.0.1:8903/index.html
+    200  http://127.0.0.1:8903/style.css
+    200  http://127.0.0.1:8903/theme.css
+    200  http://127.0.0.1:8903/cloud.js
+    200  http://127.0.0.1:8903/app.js
+    200  http://127.0.0.1:8903/theme.js
+    200  http://127.0.0.1:8903/assets/bg-night-trio.jpg
+    206  http://127.0.0.1:8903/assets/bgm-starfall-sea.ogg
+    206  http://127.0.0.1:8903/assets/bgm-starfall-sea.ogg
+    200  https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com/api/todos
+    200  https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com/api/habits
+  [Network] 失败 1 条：
+    x http://127.0.0.1:8903/assets/bgm-starfall-sea.ogg  net::ERR_ABORTED
+  [Console] 0 条：
+  [异常] 0 条：
+
+================ 步骤4 刷新页面 ================
+  [Network] 请求 0 条：
+  [Network] 回应 0 条：
+  [Console] 0 条：
+  [异常] 0 条：
+
+SUMMARY {"写请求条数":4,"写请求详情":[],"consoleError":1,"pageError":0,"failed":1}
+
+EDGE_CLOSED by=graceful port_listening=None

@@ -51,6 +51,61 @@ function commit() {
   render();
 }
 
+/* ==================== Day 24：把改动推回库 ==================== */
+
+/*
+ * 今天修的 Bug：在今日页上新建 / 编辑 / 删除习惯，**刷新之后全白做**。
+ *
+ *   复现：在页面上加一个习惯 → 刷新 → 没了。
+ *   定位：这几步只写了浏览器本机（localStorage），**一个写请求都没发**；
+ *         而页面一打开，cloud.js 的 sync 又会拿云端那份把本机覆盖掉 —— 改动就这么消失了。
+ *        （排除掉的原因：不是网断了——GET 全是 200；不是库里数据坏了——库好着；
+ *          不是页面没渲染——页面上当时确实显示了。真因只有一个：**改动没回库**。）
+ *   修复：本机照旧先落盘、先重画（秒开、断网也能用），随后异步把这次改动推回库。
+ *
+ * 一条铁规矩：**不许假成功**。推不上去必须说出来（右上角那个小标 + 一行控制台），
+ * 不能出现「页面看着存好了、其实库里没有」—— 那正是契约 §4.4 一直在防的事。
+ */
+
+function cloudReady() {
+  return !!window.HabitBoardCloud;
+}
+
+/** 把「数据来源」那个小标改成「没同步上云端」，别让人以为存好了 */
+function markUnsynced(detail) {
+  console.warn('[写回库失败] ' + detail);
+
+  var box = el('data-source');
+  if (!box) return;
+  box.title = '这次改动只存在本机：' + detail;
+  /* 本来就在「本机数据」模式下（比如用 file:// 直接打开）：那行小字已经说明白了，不必再改 */
+  if (cloudReady() && window.HabitBoardCloud.source === 'cloud') {
+    box.textContent = '没同步上云端';
+    box.className = 'data-source';
+    box.hidden = false;
+  }
+}
+
+/** 推一次写请求。res 是 cloud.js 里那个统一形状：成功静默，失败说话 */
+function afterPush(p, what) {
+  if (!p || !p.then) return;
+  p.then(function (res) {
+    if (res && res.ok) return;
+    markUnsynced(what + '：' + ((res && (res.message || res.netError)) || '未知原因'));
+  });
+}
+
+/** 用服务端那条替换本机那条（新建之后 id 以服务端为准，契约 §3.8） */
+function replaceHabit(oldId, fresh) {
+  for (var i = 0; i < state.habits.length; i++) {
+    if (state.habits[i].id === oldId) {
+      state.habits[i] = fresh;
+      return true;
+    }
+  }
+  return false;
+}
+
 function newId(prefix) {
   return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
@@ -276,6 +331,103 @@ function buildCells7(habit) {
   return wrap;
 }
 
+/*
+ * 卡片上「频率」那一行。
+ * ⚠️ 这句话必须和看板（dashboard.js 的 freqText）一字不差 ——
+ *    同一个习惯，两个页面得说出同一句话。
+ */
+function freqText(h) {
+  if (h.freqType === 'weekly') return '每周 ' + (h.freqCount || 1) + ' 次';
+  return '每天';
+}
+
+/*
+ * 拼出一张习惯卡片（Day 24）。
+ * 形状照着看板的 buildHabitCard 来：
+ *   名称 / 勾选圈 / 频率 / 本周强度 / 强度条 / 最近 7 天 / 删除
+ *
+ * 为什么改：原来这里是一行行文字（名字 + 强度 + 7 格 + 圈），看板却是卡片 ——
+ * 同一件事在两个页面长得不一样，说不过去。现在两页同一套。
+ * 名字仍是 <button>：点开详情弹层，跟改版前一样；删除也仍是「先弹确认再删」。
+ */
+function buildHabitCard(h) {
+  var s = calcStrength(h);
+  var doneToday = isHabitDoneToday(h);
+
+  var card = document.createElement('li');
+  card.className = 'habit-card' + (doneToday ? ' is-done' : '');
+  card.dataset.id = h.id;
+  card.dataset.strength = s.text === '—' ? 'none' : 'has';
+
+  var top = document.createElement('div');
+  top.className = 'card-top';
+
+  var name = document.createElement('button');
+  name.type = 'button';
+  name.className = 'card-name';
+  name.dataset.act = 'open-detail';
+  name.textContent = h.name;
+  name.title = '点开看详情';
+
+  var check = document.createElement('button');
+  check.type = 'button';
+  check.className = 'check';
+  check.dataset.act = 'toggle-habit';
+  /* aria-pressed：把「开关是开还是关」直接告诉读屏软件，不用猜 */
+  check.setAttribute('aria-pressed', doneToday ? 'true' : 'false');
+  check.setAttribute('aria-label',
+    (doneToday ? '取消完成' : '标记完成') + '：' + h.name);
+
+  top.appendChild(name);
+  top.appendChild(check);
+
+  var freq = document.createElement('p');
+  freq.className = 'card-freq';
+  freq.textContent = freqText(h);
+
+  var row = document.createElement('div');
+  row.className = 'strength-row';
+
+  var label = document.createElement('span');
+  label.className = 'strength-label';
+  label.textContent = '本周强度';
+
+  var value = document.createElement('strong');
+  value.className = 'strength-value';
+  value.textContent = s.text;
+
+  row.appendChild(label);
+  row.appendChild(value);
+
+  var bar = document.createElement('div');
+  bar.className = 'bar';
+  var fill = document.createElement('div');
+  fill.className = 'bar-fill';
+  fill.style.width = s.percent + '%';
+  bar.appendChild(fill);
+
+  /* 删除放在卡片最下面、颜色压淡：右上角是每天要点很多次的地方，别在那儿贴删除 */
+  var foot = document.createElement('div');
+  foot.className = 'card-foot';
+
+  var del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'link-danger';
+  del.dataset.act = 'del-habit';
+  del.textContent = '删除';
+  del.setAttribute('aria-label', '删除习惯：' + h.name);
+
+  foot.appendChild(del);
+
+  card.appendChild(top);
+  card.appendChild(freq);
+  card.appendChild(row);
+  card.appendChild(bar);
+  card.appendChild(buildCells7(h));
+  card.appendChild(foot);
+  return card;
+}
+
 function renderHabits() {
   var list = el('habit-list');
   var emptyBox = el('habit-empty');
@@ -285,33 +437,7 @@ function renderHabits() {
   emptyBox.hidden = habits.length > 0;
 
   habits.forEach(function (h) {
-    var li = document.createElement('li');
-    li.className = 'habit-row' + (isHabitDoneToday(h) ? ' is-done' : '');
-    li.dataset.id = h.id;
-
-    var name = document.createElement('button');
-    name.type = 'button';
-    name.className = 'habit-name';
-    name.dataset.act = 'open-detail';
-    name.textContent = h.name;
-    name.title = '点开看详情';
-
-    var strength = document.createElement('span');
-    strength.className = 'habit-strength';
-    strength.textContent = calcStrength(h).text;
-
-    var check = document.createElement('button');
-    check.type = 'button';
-    check.className = 'habit-check';
-    check.dataset.act = 'toggle-habit';
-    check.setAttribute('aria-label',
-      (isHabitDoneToday(h) ? '取消完成' : '标记完成') + '：' + h.name);
-
-    li.appendChild(name);
-    li.appendChild(strength);
-    li.appendChild(buildCells7(h));
-    li.appendChild(check);
-    list.appendChild(li);
+    list.appendChild(buildHabitCard(h));
   });
 }
 
@@ -441,11 +567,11 @@ function createHabit(name, freqType, freqCount) {
 
 /* ============================ 六、绑定事件 ============================ */
 
-/* 习惯列表：点名字开详情，点圆圈勾今天 */
+/* 习惯卡片：点名字开详情，点圆圈勾今天，点「删除」走二次确认（Day 24 加的第三个动作） */
 el('habit-list').addEventListener('click', function (ev) {
   var btn = ev.target.closest('[data-act]');
   if (!btn) return;
-  var row = btn.closest('.habit-row');
+  var row = btn.closest('.habit-card');
   if (!row) return;
   var id = row.dataset.id;
 
@@ -453,6 +579,8 @@ el('habit-list').addEventListener('click', function (ev) {
     toggleHabitToday(id);
   } else if (btn.dataset.act === 'open-detail') {
     if (typeof openDetail === 'function') openDetail(id);
+  } else if (btn.dataset.act === 'del-habit') {
+    askDelete('habit', id);
   }
 });
 
@@ -638,6 +766,7 @@ function saveHabitForm() {
     if (freqCount > 7) freqCount = 7;
   }
 
+  var created = null;
   if (editingHabitId) {
     var h = findHabit(editingHabitId);
     if (h) {
@@ -646,7 +775,7 @@ function saveHabitForm() {
       h.freqCount = freqCount;
     }
   } else {
-    createHabit(name, freqType, freqCount);
+    created = createHabit(name, freqType, freqCount);
   }
 
   var wasEditing = editingHabitId;
@@ -657,6 +786,30 @@ function saveHabitForm() {
   /* 如果是「从详情里点编辑」进来的，详情要跟着刷新 */
   if (wasEditing && detailHabitId === wasEditing && !el('detail-mask').hidden) {
     renderDetail();
+  }
+
+  /* ★ Day 24：把这一步推回库。本机已经存好了，这里只负责「让库里也知道」 */
+  if (!cloudReady()) return;
+
+  if (wasEditing) {
+    /* 改：白名单正好是 name / freqType / freqCount 三个（契约 §3.11） */
+    afterPush(
+      window.HabitBoardCloud.updateHabit(wasEditing, {
+        name: name, freqType: freqType, freqCount: freqCount
+      }),
+      '改习惯（' + name + '）'
+    );
+  } else if (created) {
+    /* 新建：成功之后拿服务端那条替换本机那条 —— id 以服务端为准，以后改/删才对得上 */
+    window.HabitBoardCloud.createHabit(created).then(function (res) {
+      if (res && res.ok && res.data) {
+        replaceHabit(created.id, res.data);
+        commit();
+      } else {
+        markUnsynced('新建习惯（' + name + '）：'
+          + ((res && (res.message || res.netError)) || '未知原因'));
+      }
+    });
   }
 }
 
@@ -717,13 +870,24 @@ function runDelete() {
   var p = pendingDelete;
   closeConfirm();
 
+  var gone = null;
   if (p.type === 'habit') {
+    gone = findHabit(p.id);                          // 名字留着，写日志用
     state.habits = state.habits.filter(function (h) { return h.id !== p.id; });
     closeDetail();
   } else {
     state.todos = state.todos.filter(function (t) { return t.id !== p.id; });
   }
   commit();
+
+  /* ★ Day 24：习惯的删除要回库（服务端默认软删，能找回，契约 §3.12）。
+     待办那条链服务端还没有写口 —— 见今日的「不做清单」。 */
+  if (p.type === 'habit' && cloudReady()) {
+    afterPush(
+      window.HabitBoardCloud.removeHabit(p.id),
+      '删习惯（' + ((gone && gone.name) || p.id) + '）'
+    );
+  }
 }
 
 el('detail-delete').addEventListener('click', function () {

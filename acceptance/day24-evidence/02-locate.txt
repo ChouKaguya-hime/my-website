@@ -1,0 +1,31 @@
+选中页面 = http://127.0.0.1:8903/index.html
+
+【C 对照组】GET /api/habits → HTTP 200，count=6
+  第一条 = {"id":"h_seed_water","name":"每天喝 8 杯水","freqType":"daily","freqCount":7,"createdAt":"2026-08-25","doneDates":["2026-10-04","2026-10-03","2026-10-02","2026-10-01","2026-09-30","2026-09-28"]}
+
+【A 实验】POST /api/todos →
+  {
+ "到达服务端": true,
+ "status": 405,
+ "body": "{\"ok\":false,\"service\":\"habit-board-api\",\"function\":\"api-todos\",\"version\":\"v1.1\",\"error\":\"method_not_allowed\",\"message\":\"这个接口只接受 GET\"}"
+}
+  这一步 Console 新增：
+    [error] Failed to load resource: the server responded with a status of 405 (Method Not Allowed)
+
+【B 实验】PATCH /api/habits/h_seed_water  body={"doneDates": <原值>} →
+  {
+ "status": 400,
+ "body": "{\"ok\":false,\"service\":\"habit-board-api\",\"function\":\"api-habits\",\"version\":\"v1.3\",\"error\":\"bad_request\",\"message\":\"没有要改的字段：请至少带上 name / freqType / freqCount 里的一个（id 和 createdAt 不能改）\"}"
+}
+
+【B2 对照】PATCH 同一地址，body={"name": 原名} → HTTP 200 ok=true
+
+================ F12 · Console ================
+  [error] Failed to load resource: the server responded with a status of 405 (Method Not Allowed)
+  [error] Failed to load resource: the server responded with a status of 400 (Bad Request)
+================ F12 · 未捕获异常 ================
+================ F12 · 失败请求 ================
+
+SUMMARY {"A_到达服务端":true,"A_status":405,"A_被拦":null,"B_status":400,"B2_status":200,"consoleError":2,"failed":0}
+
+EDGE_CLOSED by=graceful port_listening=None
