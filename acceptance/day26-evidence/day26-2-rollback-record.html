@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Day 26 回滚演练记录</title>
+<style>
+  :root { --ink:#1c1c1a; --muted:#5f5e5a; --line:#d9d6cf; --bg:#fbfaf7; --ok:#1a7f37; --warn:#9a6700; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:18px 22px 22px; background:var(--bg); color:var(--ink);
+         font: 12.5px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  h1 { font-size:17px; margin:0 0 2px; }
+  .sub { color:var(--muted); font-size:11.5px; margin:0 0 12px; }
+  h2 { font-size:13px; margin:16px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--line); }
+  table { border-collapse:collapse; width:100%; font-size:11.5px; }
+  th, td { border:1px solid var(--line); padding:4px 7px; text-align:left; vertical-align:top; }
+  th { background:#f1efe9; font-weight:600; }
+  code { font-family: Consolas, "Courier New", monospace; font-size:11px; }
+  .ok { color:var(--ok); font-weight:600; }
+  .warn { color:var(--warn); font-weight:600; }
+  .note { background:#fff8e6; border:1px solid #eadfb8; padding:6px 9px; border-radius:5px; font-size:11.5px; }
+  .two { display:flex; gap:14px; }
+  .two > div { flex:1; }
+</style>
+</head>
+<body>
+  <h1>Day 26 · 静态托管回滚演练 —— 操作记录</h1>
+  <p class="sub">站点 https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/ ｜ 环境 habit-board-d0gum6nqu512acc29 ｜ 2026-10-12</p>
+
+  <h2>一、三次「提交（上传）记录」—— 回滚前 / 回滚 / 回滚后</h2>
+  <table>
+    <thead>
+      <tr><th style="width:34px">#</th><th style="width:88px">动作</th><th style="width:96px">时间(本机)</th>
+          <th style="width:56px">耗时</th><th style="width:56px">文件数</th>
+          <th>线上签名（app.js / cloud.js 字节数）</th><th style="width:64px">结果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>发布 v1.0</td><td>14:17:51 → 14:17:56</td><td>5 秒</td><td>11</td>
+          <td><code>app.js 29596 / cloud.js 9929</code>（含 <code>sendJson</code>）</td><td class="ok">✔ 平台一致性校验通过</td></tr>
+      <tr><td>2</td><td>回退到上一版</td><td>14:19:28 → 14:19:33</td><td><b>4 秒</b></td><td>11</td>
+          <td><code>app.js 23410 / cloud.js 6251</code>（无 <code>sendJson</code>）</td><td class="ok">✔ 已退回旧版</td></tr>
+      <tr><td>3</td><td>恢复 v1.0</td><td>14:21:12 → 14:21:17</td><td>5 秒</td><td>11</td>
+          <td><code>app.js 29596 / cloud.js 9929</code>（含 <code>sendJson</code>）</td><td class="ok">✔ 平台一致性校验通过</td></tr>
+    </tbody>
+  </table>
+
+  <h2>二、回滚前后 · 线上文件签名对照（curl 实测）</h2>
+  <div class="two">
+    <div>
+      <table>
+        <thead><tr><th>文件</th><th>回滚前（v1.0）</th><th>回滚后（上一版）</th></tr></thead>
+        <tbody>
+          <tr><td>index.html</td><td>7828</td><td>7712</td></tr>
+          <tr><td>app.js</td><td>29596</td><td>23410</td></tr>
+          <tr><td>cloud.js</td><td>9929</td><td>6251</td></tr>
+          <tr><td>style.css</td><td>17574</td><td>14507</td></tr>
+          <tr><td>theme.css</td><td>13379</td><td>13191</td></tr>
+          <tr><td>cloud.js 含 sendJson</td><td>4 处</td><td>0 处</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <b>怎么判「真的换版本了」：</b>不看感觉，看<b>线上字节数</b>。<br>
+      回滚后 5 个文件全部落回旧版的字节数，<code>cloud.js</code> 里 Day 24 才加的
+      <code>sendJson</code> 从 4 处变 0 处 —— 这就是「线上确实被换回上一版」的硬证据。<br><br>
+      恢复后再测，5 个文件又全部回到 v1.0 的字节数（与本地源码逐个相等）。
+    </div>
+  </div>
+
+  <h2>三、Git 提交记录（回滚前后没有变）</h2>
+  <table>
+    <thead><tr><th style="width:78px">提交</th><th style="width:88px">日期</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>d3514fc</code></td><td>2026-10-12</td><td>Day 25｜发布前检查技能：故意种了个密钥泄漏，它真抓到了 <b>← 本次发布的代码基线（HEAD）</b></td></tr>
+      <tr><td><code>75e39b2</code></td><td>2026-10-11</td><td>Day 24 补｜归档「F12 里的报错原文」那张截图</td></tr>
+      <tr><td><code>75b5a53</code></td><td>2026-10-11</td><td>Day 24｜页面上的改动会写回库了：新建 / 改 / 删习惯，刷新不再丢</td></tr>
+      <tr><td><code>1c89f72</code></td><td>2026-10-10</td><td>Day 23｜把 500 的「裸报错」改成人话</td></tr>
+      <tr><td><code>e3b2cd2</code></td><td>2026-10-09</td><td>Day 22｜增删改查四类凑齐</td></tr>
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:8px">
+    ⚠️ 这次回滚是<b>产物级</b>的（把上一版的文件重新传上去），<b>不产生新的 Git 提交</b> ——
+    所以「回滚前」和「回滚后」的提交记录是同一份，这本身是当天要记住的一点：
+    <b>静态托管的回退不动代码仓库，动的是「线上挂着哪一版」。</b>
+    代码仓库要回退（改代码）时走的是另一条路（见仓库 <code>ROLLBACK.md</code>「Git 代码回退」一节）。
+  </p>
+</body>
+</html>

@@ -1,0 +1,99 @@
+Day 26 · 静态托管回退演练 —— 操作实录（纯文本留档）
+站点：https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/
+环境：habit-board-d0gum6nqu512acc29
+日期：2026-10-12
+工具：tcb CLI 3.8.5（受管 Node 工作区里的 @cloudbase/cli）
+
+================================================================
+【0】演练前的现场（= 线上当时是 Day 20 的旧版）
+================================================================
+本机 curl 实测（--ssl-no-revoke，带 Cache-Control: no-cache）：
+  index.html  线上 7712   本地源码 7828
+  app.js      线上 23410  本地源码 29596
+  cloud.js    线上 6251   本地源码 9929   ← 线上没有 Day 24 新增的 sendJson
+  style.css   线上 14507  本地源码 17574
+  theme.css   线上 13191  本地源码 13379
+  dashboard.html / dashboard.css / dashboard.js / theme.js  线上 == 本地
+→ 结论：线上是 Day 20 上传的那一版；Day 24 的修复从未发上去
+        （这正是 Day 25 preflight B3 报出来的那条）。
+
+留底（回退的前提，因为 tcb hosting 没有版本管理）：
+  cp -r dist/.  ..\rollback-backup\prev-release/
+  → 快照 11 个文件（当前 dist/ 的字节数与线上完全一致 = 它就是线上那一版）
+
+================================================================
+【1】发布 v1.0
+================================================================
+命令：node scripts/stage-static.js
+      → 已打包到 dist/，共 11 个文件、3518212 字节
+      （index.html 7828 / style.css 17574 / app.js 29596 / dashboard.html 17952 /
+        dashboard.css 27384 / dashboard.js 51066 / cloud.js 9929 / theme.css 13379 /
+        theme.js 8078 / assets/bg-night-trio.jpg 379170 / assets/bgm-starfall-sea.ogg 2956256）
+
+命令：tcb hosting deploy dist -e habit-board-d0gum6nqu512acc29 --verify
+起止：14:17:51 → 14:17:56（5 秒）
+输出：
+  ✔ Deployment completed https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/
+  ✔ Post-publish consistency verification completed
+  ✔ Total files: 11
+  ✔ Successfully uploaded 11 file(s)
+
+发布后核验（curl 线上 vs 本地，逐字节）：
+  index.html 7828=7828 ✔  app.js 29596=29596 ✔  cloud.js 9929=9929 ✔
+  style.css 17574=17574 ✔  theme.css 13379=13379 ✔
+  线上 cloud.js 含 sendJson：4 处 ✔
+
+发布前检查技能复跑（node skills/preflight-check/run-preflight.js）：
+  A1 PASS / A2 PASS / B1 PASS / B2 PASS / B3 PASS / C1 PASS / C2 PASS
+  → 合计 7 项：PASS 7 / FAIL 0
+（B3 由红转绿 = 「本地改了没重发」这条待办今天清掉了）
+
+期间还修了 preflight-check 自己的一个误报：
+  技能被提交（d3514fc）后，A2 开始命中 SKILL.md / run-preflight.js 里的规则字样本身
+  （"role":"service_role"、私钥头写法）。因为 A2 只扫「被跟踪」的文件，技能没提交时扫不到自己，
+  一提交就撞上。已修：三条「特征字样」比对跳过技能自身目录；「.env 真值比对」仍全量扫。
+
+================================================================
+【2】回退演练：退回上一版
+================================================================
+命令：tcb hosting deploy "C:/Users/LM/WorkBuddy/2026-09-17-21-37-40/rollback-backup/prev-release" \
+        -e habit-board-d0gum6nqu512acc29
+起止：14:19:28 → 14:19:33（4 秒）
+输出：11 个文件全部上传成功
+
+回退后核验（curl 线上，应回到旧版字节数）：
+  index.html 7712 ✔  app.js 23410 ✔  cloud.js 6251 ✔
+  style.css 14507 ✔  theme.css 13191 ✔
+  线上 cloud.js 含 sendJson：0 处 ✔
+→ 线上确实被换回了上一版。
+
+================================================================
+【3】恢复 v1.0
+================================================================
+命令：tcb hosting deploy dist -e habit-board-d0gum6nqu512acc29 --verify
+起止：14:21:12 → 14:21:17（5 秒）
+输出：
+  ✔ Deployment completed ...
+  ✔ Post-publish consistency verification completed
+  ✔ Total files: 11
+  ✔ Successfully uploaded 11 file(s)
+
+恢复后核验：
+  index.html 7828=7828 ✔  app.js 29596=29596 ✔  cloud.js 9929=9929 ✔
+  style.css 17574=17574 ✔  theme.css 13379=13379 ✔
+  线上 cloud.js 含 sendJson：4 处 ✔
+  preflight-check 复跑：PASS 7 / FAIL 0 ✔
+
+================================================================
+【耗时汇总】
+================================================================
+  发布 v1.0      5 秒
+  回退到上一版    4 秒   ← 这次演练要的那个数
+  恢复 v1.0      5 秒
+→ 单次方向切换都在 10 秒以内（主要时间在传背景图 379KB + 音乐 2.96MB 两个素材）。
+
+================================================================
+【本次没有做（按当天要求，只写进回滚手册备查）】
+================================================================
+  · 云函数回退的实操（见 ROLLBACK.md 第 3 节）
+  · 数据库恢复的实操（见 ROLLBACK.md 第 4 节）

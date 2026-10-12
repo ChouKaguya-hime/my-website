@@ -68,6 +68,14 @@ function parseEnv(text) {
 const SENSITIVE_KEY = /(KEY|SECRET|TOKEN|PASSWORD|PASSWD|PWD|DSN|CREDENTIAL)/i;
 const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.json', '.md', '.html', '.htm', '.css', '.txt', '.yml', '.yaml', '.xml', '.env', '.sh', '.ps1', '.py', '.ts']);
 
+// 本技能自身目录。它是「检查器」——文档和脚本里**必然**写着这些要查的特征字样本身
+// （比如下面 roleRe 那条标记、SKILL.md 里对它的说明）。若让它参与「特征字样」比对，
+// 就会永远自我命中，那是一条假的 FAIL。所以 A2 里三条「特征字样」比对
+// （私钥头 / service_role 标记 / 疑似 JWT）**跳过这个目录**。
+// ⚠️ 但最要紧的「.env 真值比对」**不跳过**，仍全量扫 —— 真把密钥值写进这里照样抓得到。
+// （这条排除的理由按 SKILL.md「判定硬规矩 2」的要求，也写进了 SKILL.md。）
+const SELF_DIR = 'skills/preflight-check/';
+
 // ---------- 板块 A · 密钥别泄漏 ----------
 
 function boardA() {
@@ -116,10 +124,14 @@ function boardA() {
     for (const [k, v] of sensitivePairs) {
       if (content.includes(String(v))) hits.push({ file: rel, why: `含 .env 里 ${k} 的值` });
     }
-    if (privRe.test(content)) hits.push({ file: rel, why: '含私钥头 BEGIN PRIVATE KEY' });
-    if (roleRe.test(content)) hits.push({ file: rel, why: '含 "role":"service_role" 服务端密钥标记' });
-    const jwts = content.match(jwtRe);
-    if (jwts) hits.push({ file: rel, why: `含疑似 JWT（${jwts[0].slice(0, 12)}…）` });
+    // 三条「特征字样」比对：技能自身目录跳过（见 SELF_DIR 处说明，避免自我命中）
+    const isSelf = rel.replace(/\\/g, '/').startsWith(SELF_DIR);
+    if (!isSelf) {
+      if (privRe.test(content)) hits.push({ file: rel, why: '含私钥头 BEGIN PRIVATE KEY' });
+      if (roleRe.test(content)) hits.push({ file: rel, why: '含 "role":"service_role" 服务端密钥标记' });
+      const jwts = content.match(jwtRe);
+      if (jwts) hits.push({ file: rel, why: `含疑似 JWT（${jwts[0].slice(0, 12)}…）` });
+    }
   }
 
   const uniq = [];
