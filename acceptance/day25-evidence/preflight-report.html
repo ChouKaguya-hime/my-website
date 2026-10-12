@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Day 25｜preflight-check 运行结果</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #eef1f5; color: #1b2430;
+         font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif; padding: 28px; }
+  .wrap { width: 1120px; margin: 0 auto; background: #fff; border-radius: 14px;
+          box-shadow: 0 8px 30px rgba(20,30,50,.12); overflow: hidden; }
+  .top { padding: 22px 28px 18px; border-bottom: 1px solid #e3e8ee; }
+  .top h1 { margin: 0 0 6px; font-size: 22px; }
+  .top .meta { font-family: Consolas, monospace; font-size: 12.5px; color: #5b6b80; line-height: 1.75; }
+  .banner { margin: 0; padding: 12px 28px; background: #fff5e6; border-bottom: 1px solid #f2ddb8;
+            color: #7a4e00; font-size: 13.5px; }
+  .banner b { color: #a35200; }
+  .body { padding: 8px 28px 22px; }
+  .board { margin-top: 18px; }
+  .board h2 { font-size: 14px; color: #41536b; margin: 0 0 8px; letter-spacing: .3px;
+              border-left: 4px solid #8aa0bd; padding-left: 9px; }
+  .row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 8px;
+         font-size: 13px; line-height: 1.6; }
+  .row + .row { margin-top: 6px; }
+  .row.ok { background: #f3faf5; }
+  .row.bad { background: #fdf1f0; border: 1px solid #f3c9c5; }
+  .tag { flex: none; width: 46px; text-align: center; font: 700 11.5px Consolas, monospace;
+         border-radius: 5px; padding: 2px 0; margin-top: 1px; letter-spacing: .5px; }
+  .ok .tag { background: #d8f0e0; color: #137a3f; }
+  .bad .tag { background: #f7cfcb; color: #b0271a; }
+  .id { flex: none; width: 30px; font: 700 13px Consolas, monospace; color: #41536b; margin-top: 1px; }
+  .bad .id { color: #b0271a; }
+  .txt { flex: 1; }
+  .txt .name { font-weight: 600; }
+  .txt .extra { font-family: Consolas, monospace; font-size: 12px; color: #5b6b80; margin-top: 3px; word-break: break-word; }
+  .bad .txt .extra { color: #8a3025; }
+  .sum { margin-top: 22px; padding: 16px 18px; border-radius: 10px; background: #1b2430; color: #e6ecf4;
+         font-family: Consolas, monospace; font-size: 13.5px; }
+  .sum .big { font-size: 17px; font-weight: 700; }
+  .sum .g { color: #6ee7a0; } .sum .r { color: #ff8f84; }
+  .sum ul { margin: 10px 0 0; padding-left: 18px; }
+  .sum li { margin: 5px 0; color: #ffd9d4; }
+  .foot { padding: 12px 28px 18px; font-size: 11.5px; color: #8a97a8; font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>发布前检查 · preflight-check</h1>
+    <div class="meta">
+      项目：C:\Users\LM\WorkBuddy\2026-09-17-21-37-40\my-website<br>
+      静态站：https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com<br>
+      接&nbsp;&nbsp;口：https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com<br>
+      时间：2026-10-12T01:06:56.450Z ｜ 退出码：1
+    </div>
+  </div>
+
+  <div class="banner">
+    本次演示：<b>A2 是人为塞进去的</b>一个密钥泄漏（把 <code>.env</code> 里 <code>PG_API_KEY</code> 的值写进了一个要提交的文件）
+    —— 看它有没有被抓出来。<b>抓到了。</b>
+  </div>
+
+  <div class="body">
+    <div class="board">
+      <h2>板块 A · 密钥别泄漏</h2>
+      <div class="row ok"><div class="tag">PASS</div><div class="id">A1</div>
+        <div class="txt"><div class="name">敏感文件没被 Git 跟踪（.env / *.key / *.pem / *.p12 / *.pfx）</div>
+        <div class="extra">跟踪清单 59 个文件，无敏感文件</div></div></div>
+      <div class="row bad"><div class="tag">FAIL</div><div class="id">A2</div>
+        <div class="txt"><div class="name">被跟踪的文件里没有硬编码密钥</div>
+        <div class="extra">tmp-leak-demo.js ← 含 .env 里 PG_API_KEY 的值；tmp-leak-demo.js ← 含疑似 JWT（eyJhbGciOiJS…）</div></div></div>
+    </div>
+
+    <div class="board">
+      <h2>板块 B · 公网能打开且是最新</h2>
+      <div class="row ok"><div class="tag">PASS</div><div class="id">B1</div>
+        <div class="txt"><div class="name">公网首页能打开（静态站返回 200）</div>
+        <div class="extra">HTTP 200 &nbsp;https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/</div></div></div>
+      <div class="row ok"><div class="tag">PASS</div><div class="id">B2</div>
+        <div class="txt"><div class="name">公网接口可达且是对的这份（/api-health）</div>
+        <div class="extra">HTTP 200 &nbsp;service=habit-board-api &nbsp;envId=habit-board-d0gum6nqu512acc29（与 .env 一致）</div></div></div>
+      <div class="row bad"><div class="tag">FAIL</div><div class="id">B3</div>
+        <div class="txt"><div class="name">公网那份是最新（本地改了没重发就抓）</div>
+        <div class="extra">index.html: 本地 7828 字节 ≠ 公网 7712 字节；app.js: 本地 29596 字节 ≠ 公网 23410 字节；cloud.js: 本地 9929 字节 ≠ 公网 6251 字节；style.css: 本地 17574 字节 ≠ 公网 14507 字节；theme.css: 本地 13379 字节 ≠ 公网 13191 字节</div></div></div>
+    </div>
+
+    <div class="board">
+      <h2>板块 C · 发布配置自洽</h2>
+      <div class="row ok"><div class="tag">PASS</div><div class="id">C1</div>
+        <div class="txt"><div class="name">.gitignore 挡住了该挡的（.env、dist/）</div>
+        <div class="extra">实测 .env 与 dist/ 均被忽略（git check-ignore 通过）</div></div></div>
+      <div class="row ok"><div class="tag">PASS</div><div class="id">C2</div>
+        <div class="txt"><div class="name">路由契约与部署配置一致（api-contract.md 路由表 ↔ cloudbaserc.json）</div>
+        <div class="extra">契约 3 条 [/api/health, /api/habits, /api/todos] ↔ 部署配置 3 条 [/api-health, /api/habits, /api/todos]，对得上</div></div></div>
+    </div>
+
+    <div class="sum">
+      <div class="big">合计 7 项：<span class="g">PASS 5</span> / <span class="r">FAIL 2</span></div>
+      <div style="margin-top:10px;color:#9fb0c4">未通过明细：</div>
+      <ul>
+        <li><b>A2</b>（人为种入）被跟踪的文件里没有硬编码密钥 —— tmp-leak-demo.js ← 含 .env 里 PG_API_KEY 的值</li>
+        <li><b>B3</b>（本来就欠着）公网那份是最新 —— app.js 本地 29596 / 公网 23410 字节</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="foot">preflight-check · skills/preflight-check/run-preflight.js ｜ 原样输出见 acceptance/day25-evidence/02-planted.txt</div>
+</div>
+</body>
+</html>
