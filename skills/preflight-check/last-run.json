@@ -1,28 +1,26 @@
 {
-  "when": "2026-10-13T11:22:49.737Z",
+  "when": "2026-10-13T15:36:40.188Z",
   "project": "C:\\Users\\LM\\WorkBuddy\\2026-09-17-21-37-40\\my-website",
   "staticUrl": "https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com",
   "apiUrl": "https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com",
   "total": 7,
-  "passed": 6,
-  "failed": 1,
-  "failedItems": [
-    "B3"
-  ],
+  "passed": 7,
+  "failed": 0,
+  "failedItems": [],
   "results": [
     {
       "board": "A",
       "id": "A1",
       "name": "敏感文件没被 Git 跟踪（.env / *.key / *.pem / *.p12 / *.pfx）",
       "ok": true,
-      "extra": "跟踪清单 75 个文件，无敏感文件"
+      "extra": "跟踪清单 87 个文件，无敏感文件"
     },
     {
       "board": "A",
       "id": "A2",
       "name": "被跟踪的文件里没有硬编码密钥",
       "ok": true,
-      "extra": "扫描 75 个跟踪文件（比对 .env 里 1 个敏感值 + 密钥特征），干净"
+      "extra": "扫描 87 个跟踪文件（比对 .env 里 1 个敏感值 + 密钥特征），干净"
     },
     {
       "board": "B",
@@ -42,8 +40,8 @@
       "board": "B",
       "id": "B3",
       "name": "公网那份是最新（本地改了没重发就抓）",
-      "ok": false,
-      "extra": "app.js: 本地 31288 字节 ≠ 公网 29596 字节；style.css: 本地 18302 字节 ≠ 公网 17574 字节"
+      "ok": true,
+      "extra": "比了 7 个文件，逐个字节数一致"
     },
     {
       "board": "C",

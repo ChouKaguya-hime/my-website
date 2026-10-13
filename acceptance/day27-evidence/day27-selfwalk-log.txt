@@ -82,13 +82,48 @@ RESULT=OK saved=day27-1c-selfwalk-mobile.png 773x1266 反差=51.9
 
 ---
 
+## ④ 线上（**发布修复之后**）· 桌面宽度 1240×960 ★ 最关键的一次
+
+URL：`https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/`
+窗口：1240×960 → 1860×1440
+
+```
+候选窗口 hwnd=7277358 尺寸=1860x1440
+window rect: 150 15 1860 1440
+预热 1: 工具条反差 sd=38.6 均值=228.6 极差=219.4
+预热 2: 工具条反差 sd=38.6 均值=228.6 极差=219.4
+[node] STEP gate=absent
+STEP firstScreen={"title":"习惯养成规划板","source":"云端数据库","cards":6,"count":"0 / 6"}
+STEP addHabit=ok
+STEP toggleHabit=false -> true
+STEP clickCells7=详情弹层 hidden: true -> false  ← 有反应
+STEP openDetail=ERR:page.click: Timeout 4000ms exceeded.
+正式拍 1: 工具条反差 sd=40.9 均值=227.2 极差=219.4
+RESULT=OK saved=day27-1d-live-after-release.png 1860x1440 反差=40.9
+```
+
+**结论**：线上（发布后）点那排 7 格**有反应** —— 修复在生产环境生效了。
+
+### 三次走查的同一行读数对照（这就是全部证据）
+
+| 环境 | 版本 | `clickCells7` 读数 |
+| --- | --- | --- |
+| **线上** | v1.0（修复前） | `详情弹层 hidden: true -> true` ← **点了没反应** |
+| 本地 | 修复后（未发布） | `true -> false` ← 有反应 |
+| **线上** | **修复后（已发布）** | **`true -> false` ← 有反应** ✓ |
+
+---
+
 ## 附：测试数据的清理
 
-三次走查里，「加习惯」这一步在本地/线上都会**真写进云端库**（因为 `cloud.js` 在本地也能读到云端那份，CORS 放行）。
-写进去的两条测试习惯，用 `DELETE /api/habits/<id>` **软删除**清掉了（`deleted.mode = soft`，可找回）：
+四次走查里，「加习惯」这一步在本地 / 线上都会**真写进云端库**（因为 `cloud.js` 在本地也能读到云端那份，CORS 放行）。
+写进去的 4 条测试习惯，都用 `DELETE /api/habits/<id>` **软删除**清掉了（`deleted.mode = soft`，可找回）：
 
-- `h_mv6l511r2ehdz`（第①次）
-- `h_mv6l7nwerkw4p`（第②次）
-- `h_mv6l9nhneunl2`（第③次）
+| # | id | 哪一次 |
+| --- | --- | --- |
+| ① | `h_mv6l511r2ehdz` | 线上自测（修复前） |
+| ② | `h_mv6l7nwerkw4p` | 本地自测（修复后） |
+| ③ | `h_mv6l9nhneunl2` | 手机宽度自测 |
+| ④ | `h_mv6ugymdjdgcl` | 线上验证（发布后） |
 
 清完复查：`GET /api/habits` → `count = 6`（只剩 6 条种子数据）。
