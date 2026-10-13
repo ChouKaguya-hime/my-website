@@ -76,6 +76,15 @@ const TEXT_EXT = new Set(['.js', '.mjs', '.cjs', '.json', '.md', '.html', '.htm'
 // （这条排除的理由按 SKILL.md「判定硬规矩 2」的要求，也写进了 SKILL.md。）
 const SELF_DIR = 'skills/preflight-check/';
 
+// ★ Day 27 补：同一个坑的**第二次出现** —— 「特征字样」比对**同时跳过「证据/文档」目录**。
+// 为什么：Day 26 我把「A2 为什么会误报自己」这件事原样写进了验收报告和部署日志，
+// 那一写，就把 `"role":"service_role"` 这个**规则字样**带进了 acceptance/ 下的文件；
+// Day 26 提交之后 A2 立刻在这两个**验收文档**上命中 —— 和第一次误报技能目录是同一个坑，
+// 只是换了个地方（从「技能目录」换成了「验收文档」）。
+// acceptance/ 和 user-test/ 是给人看的证据、不是发布物、也不进公网，讨论规则时必然出现规则字样。
+// ⚠️ 同 SELF_DIR：最要紧的「.env 真值比对」**依旧不跳过**，仍全量扫。
+const DOC_DIRS = ['acceptance/', 'user-test/'];
+
 // ---------- 板块 A · 密钥别泄漏 ----------
 
 function boardA() {
@@ -124,9 +133,11 @@ function boardA() {
     for (const [k, v] of sensitivePairs) {
       if (content.includes(String(v))) hits.push({ file: rel, why: `含 .env 里 ${k} 的值` });
     }
-    // 三条「特征字样」比对：技能自身目录跳过（见 SELF_DIR 处说明，避免自我命中）
-    const isSelf = rel.replace(/\\/g, '/').startsWith(SELF_DIR);
-    if (!isSelf) {
+    // 三条「特征字样」比对：技能自身目录 + 证据/文档目录 跳过（见上面两处说明，避免自我命中）
+    const relPosix = rel.replace(/\\/g, '/');
+    const isSelf = relPosix.startsWith(SELF_DIR);
+    const isDoc = DOC_DIRS.some((d) => relPosix.startsWith(d));
+    if (!isSelf && !isDoc) {
       if (privRe.test(content)) hits.push({ file: rel, why: '含私钥头 BEGIN PRIVATE KEY' });
       if (roleRe.test(content)) hits.push({ file: rel, why: '含 "role":"service_role" 服务端密钥标记' });
       const jwts = content.match(jwtRe);

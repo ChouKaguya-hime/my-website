@@ -1,0 +1,11 @@
+CloudBase CLI 3.8.5
+Try the tcb ai command to start your AI full-stack development experience
+- Loading data...
+- Loading data...
+[90m┌───────────────────────────────[39m[90m┬─────────────────[39m[90m┬───────────[39m[90m┬─────────────────────[39m[90m┬─────────────────────[39m[90m┬────────────────────┐[39m
+[90m│[39m[33m        Environment ID         [39m[90m│[39m[33m Package Version [39m[90m│[39m[33m  Source   [39m[90m│[39m[33m    Creation Time    [39m[90m│[39m[33m   Expiration time   [39m[90m│[39m[33m Environment Status [39m[90m│[39m
+[90m├───────────────────────────────[39m[90m┼─────────────────[39m[90m┼───────────[39m[90m┼─────────────────────[39m[90m┼─────────────────────[39m[90m┼────────────────────┤[39m
+[90m│[39m habit-board-d0gum6nqu512acc29 [90m│[39m     体验版      [90m│[39m CloudBase [90m│[39m 2026-10-03 10:27:00 [90m│[39m 2027-04-03 23:59:59 [90m│[39m       Normal       [90m│[39m
+[90m└───────────────────────────────[39m[90m┴─────────────────[39m[90m┴───────────[39m[90m┴─────────────────────[39m[90m┴─────────────────────[39m[90m┴────────────────────┘[39m
+ℹ Showing environments 1-1
+ℹ Note: current region is ap-shanghai. Use --region to query environments in a specific region (recommended: ap-shanghai, ap-singapore), for example tcb env list --region ap-singapore

@@ -1,0 +1,55 @@
+ℹ → TCB.DescribeBillingInfo
+{
+  "data": {
+    "EnvBillingInfoList": [
+      {
+        "EnvId": "habit-board-d0gum6nqu512acc29",
+        "PackageId": "baas_trial",
+        "IsAutoRenew": false,
+        "Status": "NORMAL",
+        "PayMode": "PREPAYMENT",
+        "IsolatedTime": "0000-00-00 00:00:00",
+        "ExpireTime": "2027-04-03 23:59:59",
+        "CreateTime": "2026-10-03 10:27:00",
+        "UpdateTime": "2026-10-03 10:27:00",
+        "IsAlwaysFree": false,
+        "PaymentChannel": "qcloud",
+        "OrderInfo": {
+          "TranId": "",
+          "PackageId": "",
+          "TranType": "",
+          "TranStatus": "",
+          "CreateTime": "",
+          "UpdateTime": "",
+          "PayMode": "",
+          "ExtensionId": "",
+          "ResourceReady": "",
+          "Flag": "",
+          "ReqBody": ""
+        },
+        "FreeQuota": "",
+        "EnvAutoId": 4657875,
+        "BillTime": "2026-10-03 10:27:00",
+        "ExtPackageType": "baas",
+        "EnableOverrun": false,
+        "EnvPaid": "yes",
+        "EnvCharged": "yes",
+        "EnvActivated": "no",
+        "EnvOrigin": "normal",
+        "ResourceId": "habit-board-d0gum6nqu512acc29",
+        "ExtPackageCode": [],
+        "TipList": "",
+        "PackageName": "体验版",
+        "EnvDeductionMode": "credits",
+        "PointsTime": "2026-10-03 10:26:43",
+        "EnvQps": {
+          "QpsQuota": 500,
+          "QpsCustomLimit": -1
+        },
+        "UsageStatus": "normal"
+      }
+    ],
+    "RequestId": "ce6e1fd0-0f1b-4b1a-b87b-ac529b93d1b4",
+    "Total": 1
+  }
+}

@@ -322,6 +322,27 @@ function renderTodayBar() {
 function buildCells7(habit) {
   var wrap = document.createElement('span');
   wrap.className = 'cells7';
+
+  /*
+   * ★ Day 27 修复（Day 14 一位真人留下的卡点，一直开着没修）
+   *
+   * 这一排格子看着很像「最近几天做了什么」，人也一定会去点它 ——
+   * 想补记昨天，就点昨天那一格，这是最自然的动作。
+   *
+   * 可它以前**不带 data-act**，而卡片上的点击是靠事件委托找 [data-act] 的（见文件末尾），
+   * 所以点下去一声不响 —— 用户会以为「坏了 / 点错了」。
+   * Day 14 真人的原话就是：「补记入口不明显，并未明显暴露」。
+   *
+   * 现在把它接到「打开详情」上：点这排格子 = 打开这个习惯的详情弹层，
+   * 里面那 28 格才是真正的补记入口（点过去的格子可以补勾）。
+   * 它只负责**带路**，不直接改数据 —— 免得手一抖就把记录改了。
+   */
+  wrap.dataset.act = 'open-detail';
+  wrap.setAttribute('role', 'button');
+  wrap.setAttribute('tabindex', '0');
+  wrap.setAttribute('aria-label', '查看「' + habit.name + '」详情，可以补记过去的日子');
+  wrap.title = '点开看详情，可以补勾过去的日子';
+
   var done = Array.isArray(habit.doneDates) ? habit.doneDates : [];
   lastNDays(7).forEach(function (d) {
     var c = document.createElement('i');
@@ -582,6 +603,19 @@ el('habit-list').addEventListener('click', function (ev) {
   } else if (btn.dataset.act === 'del-habit') {
     askDelete('habit', id);
   }
+});
+
+/*
+ * Day 27：那排 7 格是 <span role="button">（不是真的 <button>），
+ * 键盘 Tab 能聚焦，但回车 / 空格不会自己触发 click —— 这里补上。
+ * 只对「不是 BUTTON 的委托目标」生效，免得和 <button> 的默认行为叠起来触发两次。
+ */
+el('habit-list').addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  var target = ev.target.closest('[data-act]');
+  if (!target || target.tagName === 'BUTTON') return;
+  ev.preventDefault();
+  target.click();
 });
 
 /* 待办列表：点勾选框切换完成，点行尾 × 走删除确认（Day 14 补上后者） */

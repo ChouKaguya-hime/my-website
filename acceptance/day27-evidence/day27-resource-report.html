@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Day 27 · 资源额度检查</title>
+<style>
+  :root{
+    --ink:#1a2230; --ink2:#4b5768; --ink3:#7b8798;
+    --line:#e2e7ef; --bg:#f6f8fb; --card:#ffffff;
+    --ok:#0f9d63; --okbg:#e8f8f0; --warn:#c8791a; --warnbg:#fdf4e6;
+    --accent:#2b6cb0; --accentbg:#eaf2fb;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); padding:34px 40px 40px; width:1100px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .head{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:14px}
+  .head h1{font-size:25px;letter-spacing:.5px}
+  .head .sub{font-size:13px;color:var(--ink3);margin-top:6px}
+  .head .stamp{font-size:12px;color:var(--ink3);text-align:right;line-height:1.7}
+  .verdict{
+    margin-top:20px;background:var(--okbg);border:1px solid #bfe8d3;border-left:5px solid var(--ok);
+    border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:14px;
+  }
+  .verdict .mark{font-size:22px}
+  .verdict b{color:var(--ok);font-size:15px}
+  .verdict p{font-size:13px;color:var(--ink2);margin-top:4px;line-height:1.6}
+  .cards{display:flex;gap:16px;margin-top:20px}
+  .card{
+    flex:1;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+    box-shadow:0 1px 2px rgba(20,40,80,.04);
+  }
+  .card .k{font-size:12px;color:var(--ink3);letter-spacing:.4px}
+  .card .v{font-size:27px;font-weight:700;margin-top:8px;line-height:1.15}
+  .card .v small{font-size:14px;font-weight:400;color:var(--ink3)}
+  .card .n{font-size:12px;color:var(--ink3);margin-top:7px}
+  .card.hl .v{color:var(--accent)}
+  .card.money .v{color:var(--ok)}
+  .bar{height:8px;border-radius:6px;background:#eef1f6;margin-top:11px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#4a9de0,#2b6cb0);border-radius:6px}
+  h2{font-size:15px;margin:26px 0 11px;padding-left:10px;border-left:4px solid var(--accent)}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:9px;overflow:hidden;font-size:13px}
+  th,td{padding:9px 13px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:#f0f3f8;font-weight:600;color:var(--ink2);font-size:12px;letter-spacing:.3px}
+  tr:last-child td{border-bottom:none}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .mini{display:inline-block;height:7px;border-radius:4px;background:#4a9de0;vertical-align:middle;margin-right:8px}
+  .total td{background:#f7f9fc;font-weight:700}
+  .foot{margin-top:22px;font-size:11.5px;color:var(--ink3);line-height:1.9;border-top:1px dashed var(--line);padding-top:12px}
+  .foot code{background:#eef1f6;padding:1px 5px;border-radius:4px;font-size:11px;color:var(--ink2)}
+  .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .tag{font-size:11.5px;padding:3px 10px;border-radius:20px;background:var(--accentbg);color:var(--accent)}
+  .tag.warn{background:var(--warnbg);color:var(--warn)}
+</style>
+</head>
+<body>
+
+  <div class="head">
+    <div>
+      <h1>Day 27 · 资源额度检查</h1>
+      <div class="sub">习惯养成规划板 · 线上环境资源盘点（额度 / 到期日期 / 用量）</div>
+    </div>
+    <div class="stamp">
+      检查时间：2026-10-13<br>
+      环境：habit-board-d0gum6nqu512acc29<br>
+      区域：ap-shanghai
+    </div>
+  </div>
+
+  <div class="verdict">
+    <span class="mark">✅</span>
+    <div>
+      <b>结论：额度充足，离到期还早，但「不自动续费」要记一笔</b>
+      <p>本计费周期（2026-10-03 ~ 2026-11-03）只用了 <b>16.32 / 3000 资源点（0.54%）</b>，按当前用量推算，
+      整个套餐额度可以支撑约 <b>180 倍</b> 于现在的使用强度；环境到期时间 <b>2027-04-03</b>，还剩约 5.7 个月。
+      唯一要盯的是：这是<b>体验版且不自动续费</b>，到期不会自动续，需要人工决定续费或迁移。</p>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card hl">
+      <div class="k">本周期已用额度</div>
+      <div class="v">16.32 <small>/ 3000 点</small></div>
+      <div class="bar"><i style="width:0.54%"></i></div>
+      <div class="n">占比 0.54%（计费周期 10-03 ~ 11-03）</div>
+    </div>
+    <div class="card money">
+      <div class="k">环境到期日期</div>
+      <div class="v" style="font-size:23px">2027-04-03</div>
+      <div class="n">23:59:59 到期 · 剩余约 172 天 · <b>不自动续费</b></div>
+    </div>
+    <div class="card">
+      <div class="k">套餐 / 状态</div>
+      <div class="v" style="font-size:23px">体验版</div>
+      <div class="n">包 ID <code>baas_trial</code> · 状态 Normal · QPS 配额 500</div>
+    </div>
+  </div>
+
+  <h2>各项资源点用量明细（本计费周期）</h2>
+  <table>
+    <thead>
+      <tr><th style="width:30%">模块</th><th>真实用量</th><th class="num">资源点</th><th class="num">占比</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>API calls</td>
+        <td><span class="mini" style="width:96px"></span>CloudBase API 调用 896 次</td>
+        <td class="num">8.96</td><td class="num">54.9%</td>
+      </tr>
+      <tr>
+        <td>云函数 Cloud function</td>
+        <td><span class="mini" style="width:60px"></span>调用 510 次 / 29 GBs / 出网 1470 KB</td>
+        <td class="num">5.58</td><td class="num">34.2%</td>
+      </tr>
+      <tr>
+        <td>HTTP gateway</td>
+        <td><span class="mini" style="width:18px"></span>HTTP 调用 552 次</td>
+        <td class="num">1.67</td><td class="num">10.2%</td>
+      </tr>
+      <tr>
+        <td>静态网站托管</td>
+        <td>存储 26 MB / 出网流量 0</td>
+        <td class="num">0.10</td><td class="num">0.6%</td>
+      </tr>
+      <tr>
+        <td>云存储 Cloud storage</td>
+        <td>写请求 5 次</td>
+        <td class="num">0.01</td><td class="num">0.1%</td>
+      </tr>
+      <tr>
+        <td>其他（NoSQL / MySQL / AI / 认证 / 云主机 / 工作流 / 短信）</td>
+        <td>全部 0</td>
+        <td class="num">0.00</td><td class="num">0%</td>
+      </tr>
+      <tr class="total">
+        <td>合计</td><td>—</td>
+        <td class="num">16.32</td><td class="num">100%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="tags">
+    <span class="tag">全部数字来自 tcb CLI 实测输出，原始文本同目录留档</span>
+    <span class="tag warn">⚠ 体验版不自动续费，2027-04-03 到期</span>
+  </div>
+
+  <div class="foot">
+    数据来源（全部为命令行实测原始输出，同目录留档备查）：<br>
+    ① <code>tcb env list</code> —— 套餐 / 创建时间 / 到期时间 / 环境状态 → <code>day27-resource-envlist.txt</code><br>
+    ② <code>tcb env usage -e &lt;envId&gt;</code> —— 包内资源点总量与分模块用量 → <code>day27-resource-usage.txt</code><br>
+    ③ <code>tcb env info -e &lt;envId&gt; --yes</code> —— 每个指标的细粒度用量（调用次数 / GBs / KB）→ <code>day27-resource-info.txt</code><br>
+    ④ <code>tcb api tcb DescribeBillingInfo</code> —— 权威计费信息（PackageId / ExpireTime / 是否自动续费）→ <code>day27-billing-info.json</code>
+  </div>
+
+</body>
+</html>

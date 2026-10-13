@@ -1,0 +1,94 @@
+# Day 27 自测走查日志（真实浏览器 CDP，带地址栏）
+
+工具：`browser-shot-pixel-audit` 技能的 `shot_cdp.py` + `cdp_click.js`（动作 `walk-core-flow`）。
+动作内容：点掉中间页 → 读首屏 → 加一个习惯 → 打卡 → **点那排 7 格** → 点名字开详情。
+每次跑之前都删掉 profile 目录（避免技能记的「同动作名拍到旧代码」那个坑）。
+
+---
+
+## ① 线上 v1.0（修复前）· 2026-10-13
+
+URL：`https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/`
+窗口：1240×960（逻辑像素）→ 抓到 1860×1440
+
+```
+按标题没找到，改用进程 PID 匹配到 1 个窗口（pid=28748）
+候选窗口 hwnd=786726 尺寸=1860x1440
+window rect: 150 15 1860 1440
+预热 1: 工具条反差 sd=34.4 均值=231.1 极差=186.6
+预热 2: 工具条反差 sd=34.4 均值=231.1 极差=186.6
+[node] STEP gate=absent
+STEP firstScreen={"title":"习惯养成规划板","source":"云端数据库","cards":6,"count":"0 / 6"}
+STEP addHabit=ok
+STEP toggleHabit=false -> true
+STEP clickCells7=详情弹层 hidden: true -> true  ← 点了没反应
+STEP openDetail=可点的日子 23 格
+AFTER_ACTION={"url":"https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/","hash":"","badge":null,"shownStates":[],"boardState":[],"habitState":[],"cards":7,"cardNames":["每天喝 8 杯水","每天走 6000 步","背 15 个单词","睡前阅读 20 分钟","去健身房","写一段日记","Day27试用-临时习惯"],"todos":0,"habitHint":"","todoHint":"","waterDone":null,"toastText":"","toastShown":false}
+正式拍 1: 工具条反差 sd=40.9 均值=227.2 极差=219.4
+RESULT=OK saved=day27-1-selfwalk-before-fix.png 1860x1440 反差=40.9
+```
+
+**结论**：线上核心流程能跑；**点那排 7 格没反应**（Debug 结论：Day 14 真人卡点的原样复现）。
+
+---
+
+## ② 本地（修复后）· 桌面宽度 1240×960
+
+URL：`http://127.0.0.1:8901/index.html`（`python -m http.server`，目录 = 仓库根）
+窗口：1240×960 → 1860×1440
+
+```
+候选窗口 hwnd=14290028 尺寸=1860x1440
+window rect: 150 15 1860 1440
+预热 1: 工具条反差 sd=39.0 均值=238.9 极差=219.4
+预热 2: 工具条反差 sd=39.0 均值=238.9 极差=219.4
+[node] STEP gate=absent
+STEP firstScreen={"title":"习惯养成规划板","source":"云端数据库","cards":6,"count":"0 / 6"}
+STEP addHabit=ok
+STEP toggleHabit=false -> true
+STEP clickCells7=详情弹层 hidden: true -> false  ← 有反应
+STEP openDetail=ERR:page.click: Timeout 4000ms exceeded.
+AFTER_ACTION={"url":"http://127.0.0.1:8901/index.html","hash":"","badge":null,"shownStates":[],"boardState":[],"habitState":[],"cards":7,"cardNames":[...],"todos":0,...}
+正式拍 1: 工具条反差 sd=40.9 均值=227.2 极差=219.4
+RESULT=OK saved=day27-1b-selfwalk-after-fix.png 1860x1440 反差=40.9
+```
+
+**结论**：**点那排 7 格有反应了** —— 详情弹层被打开。
+（`openDetail` 那步 Timeout 是因为弹层已经被上一步打开、挡住了卡片 —— 恰好是上一步生效的旁证。）
+
+---
+
+## ③ 本地（修复后）· 手机宽度 390×844
+
+URL：`http://127.0.0.1:8901/index.html`
+窗口：390×844（逻辑像素）→ 抓到 773×1266
+
+```
+候选窗口 hwnd=853510 尺寸=773x1266
+window rect: 150 15 773 1266
+预热 1: 工具条反差 sd=49.8 均值=226.3 极差=219.4
+预热 2: 工具条反差 sd=49.8 均值=226.3 极差=219.4
+[node] STEP gate=absent
+STEP firstScreen={"title":"习惯养成规划板","source":"云端数据库","cards":6,"count":"0 / 6"}
+STEP addHabit=ok
+STEP toggleHabit=false -> true
+STEP clickCells7=详情弹层 hidden: true -> false  ← 有反应
+STEP openDetail=ERR:page.click: Timeout 4000ms exceeded.
+正式拍 1: 工具条反差 sd=51.9 均值=224.4 极差=219.4
+RESULT=OK saved=day27-1c-selfwalk-mobile.png 773x1266 反差=51.9
+```
+
+**结论**：手机宽度下核心流程（加习惯 → 打卡 → 点格子开详情）走通，修复同样生效。
+
+---
+
+## 附：测试数据的清理
+
+三次走查里，「加习惯」这一步在本地/线上都会**真写进云端库**（因为 `cloud.js` 在本地也能读到云端那份，CORS 放行）。
+写进去的两条测试习惯，用 `DELETE /api/habits/<id>` **软删除**清掉了（`deleted.mode = soft`，可找回）：
+
+- `h_mv6l511r2ehdz`（第①次）
+- `h_mv6l7nwerkw4p`（第②次）
+- `h_mv6l9nhneunl2`（第③次）
+
+清完复查：`GET /api/habits` → `count = 6`（只剩 6 条种子数据）。

@@ -308,7 +308,24 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 .habit-card .bar { height: 6px; border-radius: 3px; }
 
 /* 最近 7 天：7 段等宽的小条，铺满整卡宽 */
-.habit-card .cells7 { display: flex; gap: 5px; flex: none; }
+/*
+ * Day 27：这排格子现在可点了（点 = 打开详情，见 app.js 的 buildCells7）。
+ * 两件事一起做：
+ *   ① 格子本身只有 6px 高，直接点几乎点不中 —— 用透明内边距把可点区撑到 20px，
+ *      再用等量负外边距把视觉位置拉回原样（看着没变，好点多了）。
+ *   ② 光标 + hover 变深，让人知道「这里能点」。
+ */
+.habit-card .cells7 {
+  display: flex; gap: 5px; flex: none;
+  cursor: pointer;
+  padding: 7px 0;
+  margin: -7px 0;
+  border-radius: 4px;
+}
+
+/* hover / 键盘聚焦时要看得出来「能点」，不然等于白接 */
+.habit-card .cells7:hover .cell:not(.on) { background: var(--faint); }
+.habit-card .cells7:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .habit-card .cells7 .cell {
   flex: 1;
