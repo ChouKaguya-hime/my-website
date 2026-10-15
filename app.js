@@ -185,6 +185,39 @@ function calcStrength(habit) {
   return { text: pct + '%', percent: pct };
 }
 
+/*
+ * 详情弹层专用：把两个口径都说成人话（Day 14 第 5 条的回补）。
+ * 用户问的是「最近一个月坚持得怎么样」，原来只答「本周强度 29%」——
+ * 口径不对，而且 29% 没说是「什么的 29%」。这里修成：
+ *   · 最近 28 天 → 「12/24 天」（数天数；每周 N 次型也成立，不会被「分母该是几」绕进去）
+ *   · 最近 7 天  → 「3/7 天 · 43%」（补上分子分母，%不再是光秃秃一个数）
+ * 28 天窗口和下面的格子用同一个 build28Dates()，数字和图不会两张嘴。
+ */
+function strengthDetail(h) {
+  var done = Array.isArray(h.doneDates) ? h.doneDates : [];
+
+  var win = lastNDays(7);
+  var hit7 = 0;
+  for (var i = 0; i < win.length; i++) {
+    if (done.indexOf(win[i]) !== -1) hit7++;
+  }
+  var denom = h.freqType === 'weekly'
+    ? Math.max(1, Number(h.freqCount) || 1)
+    : 7;
+  var s = calcStrength(h);
+  var text7 = (hit7 === 0) ? '—' : hit7 + '/' + denom + ' 天 · ' + s.text;
+
+  var d28 = build28Dates();
+  var today = todayStr();
+  var done28 = 0, elapsed28 = 0;
+  for (var j = 0; j < d28.length; j++) {
+    if (d28[j] > today) continue;          // 没到的日子不算进分母
+    elapsed28++;
+    if (done.indexOf(d28[j]) !== -1) done28++;
+  }
+  return { text7: text7, days28: done28 + '/' + elapsed28 + ' 天' };
+}
+
 function isHabitDoneToday(habit) {
   return Array.isArray(habit.doneDates) && habit.doneDates.indexOf(todayStr()) !== -1;
 }
@@ -682,7 +715,9 @@ function renderDetail() {
   el('detail-name').textContent = h.name;
 
   var s = calcStrength(h);
-  el('detail-strength').textContent = s.text;
+  var sd = strengthDetail(h);
+  el('detail-month').textContent = sd.days28;
+  el('detail-strength').textContent = sd.text7;
   el('detail-bar').style.width = s.percent + '%';
 
   var t = todayStr();

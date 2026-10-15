@@ -1,8 +1,8 @@
 {
-  "when": "2026-10-04T02:27:25.265Z",
+  "when": "2026-10-15T13:07:29.732Z",
   "target": "http://localhost:8000/dashboard.html",
-  "total": 28,
-  "passed": 28,
+  "total": 29,
+  "passed": 29,
   "failed": 0,
   "failedItems": [],
   "results": [
@@ -106,13 +106,13 @@
       "id": "F6",
       "name": "选中态按钮文字对比度 ≥ 4.5:1（WCAG AA）",
       "ok": true,
-      "extra": "6.52:1  rgb(255, 255, 255) on rgb(24, 95, 165)"
+      "extra": "7.04:1  rgb(255, 255, 255) on rgb(143, 67, 21)"
     },
     {
       "id": "F6",
       "name": "Tab 到筛选按钮时有可见的键盘焦点环",
       "ok": true,
-      "extra": "all → solid 2px rgb(24, 95, 165)"
+      "extra": "all → solid 2px rgb(143, 67, 21)"
     },
     {
       "id": "F7",
@@ -122,9 +122,15 @@
     },
     {
       "id": "F7",
-      "name": "全程零外部网络请求（AC-10）",
+      "name": "零第三方依赖：外部请求只许打自家云端接口，且已被测试拦下（AC-10，Day 17 起的口径）",
       "ok": true,
-      "extra": "0 条外部请求"
+      "extra": "自家 API 请求 8 条（全部被拦，页面回落本地存储）"
+    },
+    {
+      "id": "F7",
+      "name": "云端接口被拦后页面不崩，筛选照常工作（回落路径）",
+      "ok": true,
+      "extra": "回落本地存储后 0 条 JS 异常"
     },
     {
       "id": "F7",

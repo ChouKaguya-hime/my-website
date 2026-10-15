@@ -67,7 +67,9 @@ const ENV_ID = process.env.TCB_ENV || process.env.SCF_NAMESPACE || 'unknown';
 const SERVICE = 'habit-board-api';
 const FUNC_NAME = 'api-habits';
 // Day 22：本函数新增 PATCH（改）和 DELETE（删）—— 请求/响应都变了，契约从 v1.2 升到 v1.3。
-const CONTRACT_VERSION = 'v1.3';
+// Day 28 回补：GET /api/habits/<id>（契约里没有的「读单条」）原来被兜底成返回整个列表，
+// 现在按 405 明说「没有这条路」。定义了新行为，契约从 v1.3 升到 v1.4。
+const CONTRACT_VERSION = 'v1.4';
 
 // 这个函数在「同一个地址」上接受的全部方法（405 的 allow 头、CORS 都照它写，只维护一处）
 const ALLOWED_METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
@@ -468,6 +470,18 @@ exports.main = async (event, context) => {
   if (method === 'OPTIONS') return done(reply(204, null), { outcome: 'preflight' });
 
   if (method === 'GET') {
+    // ★ Day 28 回补：GET /api/habits/<id> 不在本接口的路由里（契约 3.2 只有「GET 列表」）。
+    // 原来这里的代码不看点路径，任何 GET 都当列表答 —— 契约外地址被「兜底成另一个答案」，
+    // 是最误导人的一种行为（看着 200，其实答非所问）。现在按 Day 22 的 405 风格明说。
+    const getId = pickPathId(event);
+    if (getId) {
+      return done(
+        fail(405, 'method_not_allowed',
+          '读单条不在本接口的路由里：列表用 GET /api/habits；改一条用 PATCH /api/habits/' + getId,
+          { allow: ALLOWED_METHODS }),
+        { outcome: 'method_not_allowed', reason: 'get_with_id' }
+      );
+    }
     try {
       const limit = parseLimit(query(event).limit);
 

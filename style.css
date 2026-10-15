@@ -94,7 +94,15 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
  * 顶栏右侧通往看板的链接（Day 13）。
  * 它和看板里的 .nav-out 同名，但两个文件各管各的样式，互不影响。
  */
-.nav-out { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.nav-out {
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  /* Day 14 第 7 条回补：原来 39×21px 够不着拇指线 —— 透明内边距把可点区撑到 ≥44px 高，
+     负边距把视觉位置拉回原处（Day 27 修那排 7 格的同一套手法，只放大可点区、不动视觉） */
+  padding: 12px 10px;
+  margin: -12px -10px;
+}
 .nav-out:hover { text-decoration: underline; }
 .nav-out:focus-visible {
   outline: 2px solid var(--accent);
@@ -246,12 +254,14 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
   text-align: left;
   border: none;
   background: none;
-  padding: 0;
   color: inherit;
   font-size: 15px;
   font-weight: 600;
   line-height: 1.4;
   word-break: break-word;
+  /* Day 14 回补：名字可点区从 19px 高撑到 ≥44px 拇指线（透明内边距 + 负边距，视觉不动） */
+  padding: 12px 8px;
+  margin: -12px -8px;
 }
 
 .card-name:hover { color: var(--accent); }
@@ -273,6 +283,15 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
   border: 1.5px solid var(--line);
   background: #fff;
   padding: 0;
+}
+
+/* Day 14 回补：圆只有 24px 够不着拇指线 —— 圆不能靠 padding 撑（边框会跟着大），
+   用 ::before 把可点区外扩到 44×44，圆本身一根线都没动 */
+.check::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
 }
 
 .habit-card.is-done .check {
@@ -538,6 +557,9 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 .strength-label { font-size: 13px; color: var(--muted); }
 
 .strength-value { font-size: 20px; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* 28 天那行字号小一号：它回答「这个月坚持得怎么样」，是配角；7 天那行才是主角（Day 14 第 5 条回补） */
+.strength-value-sub { font-size: 15px; }
 
 .bar {
   height: 8px;

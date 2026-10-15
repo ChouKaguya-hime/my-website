@@ -123,6 +123,15 @@ async function pick(page, f) {
     const u = req.url();
     if (!u.startsWith(BASE) && !u.startsWith('data:') && !u.startsWith('blob:')) external.push(u);
   });
+
+  /*
+   * ★ Day 28 回补：页面从 Day 17 起设计上就会读**自家云端接口**（无构建、零第三方依赖的
+   *   项目硬约束没变，自家 API 不是第三方）。旧断言「零外部网络请求」和这件事已经对不上，
+   *   而且云端数据异步到达会把种子数据顶掉 —— 两次跑结果不一样，全是抖动。
+   * 解法：测试里把云端请求拦下，让页面走它本来就有的「云端读不到 → 回落本地存储」路径
+   * （cloud.js 的设计行为），种子数据从此稳定。AC-10 断言同步改口径（见 F7）。
+   */
+  await page.route(/app\.tcloudbase\.com\//, (r) => r.abort());
   page.on('pageerror', (e) => pageErrors.push(String(e.message || e)));
   page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
 
@@ -300,8 +309,19 @@ async function pick(page, f) {
   check('F7', '渲染后的页面文本里没有文案黑名单（AC-6）',
     hit.length === 0, hit.length ? '命中：' + hit.join('、') : '四个词命中 0');
 
-  check('F7', '全程零外部网络请求（AC-10）',
-    external.length === 0, external.length ? external.join(' , ') : '0 条外部请求');
+  // Day 28 回补：AC-10 的现时代口径 —— 页面允许打**自家**云端接口（Day 17 起），
+  // 但仍然**一个第三方域名都不许碰**；本检查里云端请求已按上面 route 拦下（数据回落本地）。
+  const thirdParty = external.filter(
+    (u) => u.indexOf('tcloudbase.com') === -1 && u.indexOf('tcloudbaseapp.com') === -1
+  );
+  const ownApi = external.filter(
+    (u) => u.indexOf('tcloudbase.com') !== -1 || u.indexOf('tcloudbaseapp.com') !== -1
+  ).length;
+  check('F7', '零第三方依赖：外部请求只许打自家云端接口，且已被测试拦下（AC-10，Day 17 起的口径）',
+    thirdParty.length === 0,
+    thirdParty.length ? '第三方请求：' + thirdParty.join(' , ') : '自家 API 请求 ' + ownApi + ' 条（全部被拦，页面回落本地存储）');
+  check('F7', '云端接口被拦后页面不崩，筛选照常工作（回落路径）',
+    pageErrors.length === 0, pageErrors.join(' | ') || '回落本地存储后 0 条 JS 异常');
 
   /*
    * console 里那条 404 到底是谁 —— **实测一遍再说**，不按「大概是 favicon」拍脑袋。
@@ -309,7 +329,9 @@ async function pick(page, f) {
    */
   const favRes = await page.request.get(BASE + '/favicon.ico');
   const favicon404 = favRes.status() === 404;
-  const KNOWN_NOISE = /Failed to load resource: the server responded with a status of 404/;
+  // 已知噪音 ① favicon 404（静态服务没放图标）② net::ERR_FAILED ——
+  // 那是上面 route() 故意拦掉云端请求时浏览器自己报的，Day 28 回补起计入已知（不是页面代码的毛病）
+  const KNOWN_NOISE = /Failed to load resource: (?:the server responded with a status of 404|net::ERR_FAILED)/;
   const unexpected = consoleErrors.filter((t) => !KNOWN_NOISE.test(t));
 
   check('F7', '没有 JS 异常（pageerror）',

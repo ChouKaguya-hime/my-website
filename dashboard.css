@@ -243,9 +243,11 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 .card-name {
   font-size: 15px;
   font-weight: 600;
-  margin: 0;
   line-height: 1.4;
   word-break: break-word;
+  /* Day 14 回补：同今日页，名字可点区撑到 ≥44px 拇指线，视觉不动 */
+  padding: 12px 8px;
+  margin: -12px -8px;
 }
 
 /*
@@ -274,6 +276,14 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
   position: relative;
 }
 
+/* Day 14 回补：同今日页，::before 把可点区外扩到 44×44，圆本身不动 */
+.check::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+}
+
 .habit-card.is-done .check { border-color: var(--done); background: var(--done); }
 
 .habit-card.is-done .check::after {
@@ -297,6 +307,9 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 .strength-label { color: var(--muted); font-size: 12px; }
 .strength-value { font-size: 15px; color: var(--accent); }
+
+/* 28 天那行：和 7 天同字号，详情页里两个口径并排（Day 14 第 5 条回补） */
+.strength-value-sub { font-variant-numeric: tabular-nums; }
 .habit-card[data-strength="none"] .strength-value { color: var(--faint); }
 
 .bar {
@@ -594,7 +607,15 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 }
 
 /* 「今日页」是跳到**另一个文件**的链接，和视图内切换区分开，推到最右边 */
-.nav-out { margin-left: auto; color: var(--accent); }
+.nav-out {
+  margin-left: auto;
+  color: var(--accent);
+  /* Day 14 第 7 条回补：同今日页，可点区撑到 ≥44px 高，视觉不动 */
+  padding: 12px 10px;
+  margin-top: -12px;
+  margin-bottom: -12px;
+  margin-right: -10px;
+}
 .nav-out:hover { text-decoration: underline; }
 
 /* ---------------------------------------------------------------- 面包屑（Day 13） */
