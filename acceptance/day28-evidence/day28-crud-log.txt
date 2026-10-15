@@ -1,0 +1,36 @@
+Day 28 线上 CRUD 循环（验收官检测 · 一次写入+持久化+PATCH/DELETE）
+时间: 2026-10-15 11:48:07 +0800   环境: habit-board-d0gum6nqu512acc29 (ap-shanghai)
+====================================================
+
+[1/6] POST /api/habits  新建一条验收测试习惯
+{"ok":true,"service":"habit-board-api","function":"api-habits","version":"v1.3","envId":"habit-board-d0gum6nqu512acc29","generatedAt":"2026-10-15T03:48:10.871Z","data":{"id":"h_mv900o780jz5h","name":"Day28验收-临时条目","freqType":"weekly","freqCount":3,"createdAt":"2026-10-15","doneDates":[]}}
+
+>> 新建得到 id = h_mv900o780jz5h
+
+[2/6] GET /api/habits/h_mv900o780jz5h  读回（持久化第一证）
+{"ok":true,"service":"habit-board-api","function":"api-habits","version":"v1.3","envId":"habit-board-d0gum6nqu512acc29","count":7,"generatedAt":"2026-10-15T03:48:12.572Z","data":[{"id":"h_seed_water","name":"每天喝 8 杯水","freqType":"daily","freqCount":7,"createdAt":"2026-08-25","doneDates":["2026-10-04","2026-10-03","2026-10-02","2026-10-01","2026-09-30","2026-09-28"]},{"id":"h_seed_walk","name":"每天走 6000 步","freqType":"daily","freqCount":7,"createdAt":"2026-08-30","doneDates":["2026-10-04","2026-10-03","2026-10-01","2026-09-29"]},{"id":"h_seed_english","name":"背 15 个单词","freqType":"daily","freqCount":7,"createdAt":"2026-09-04","doneDates":["2026-10-02"]},{"id":"h_seed_read","name":"睡前阅读 20 分钟","freqType":"daily","freqCount":7,"createdAt":"2026-09-06","doneDates":["2026-10-03","2026-09-30"]},{"id":"h_seed_gym","name":"去健身房","freqType":"weekly","freqCount":3,"createdAt":"2026-09-13","doneDates":["2026-10-04","2026-10-02","2026-09-29"]},{"id":"h_seed_diary","name":"写一段日记","freqType":"weekly","freqCount":2,"createdAt":"2026-09-20","doneDates":["2026-10-01"]},{"id":"h_mv900o780jz5h","name":"Day28验收-临时条目","freqType":"weekly","freqCount":3,"createdAt":"2026-10-15","doneDates":[]}]}
+
+[3/6] 再次 GET 列表，确认它出现在列表里
+列表中出现: True {'id': 'h_mv900o780jz5h', 'name': 'Day28验收-临时条目', 'freqType': 'weekly', 'freqCount': 3, 'createdAt': '2026-10-15', 'doneDates': []}
+
+[4/6] PATCH /api/habits/h_mv900o780jz5h  改名
+{"ok":true,"service":"habit-board-api","function":"api-habits","version":"v1.3","envId":"habit-board-d0gum6nqu512acc29","generatedAt":"2026-10-15T03:48:14.217Z","data":{"id":"h_mv900o780jz5h","name":"Day28验收-已改名","freqType":"weekly","freqCount":5,"createdAt":"2026-10-15","doneDates":[]}}
+
+[5/6] DELETE /api/habits/h_mv900o780jz5h  软删
+{"ok":true,"service":"habit-board-api","function":"api-habits","version":"v1.3","envId":"habit-board-d0gum6nqu512acc29","generatedAt":"2026-10-15T03:48:14.818Z","deleted":{"mode":"soft","recoverable":true},"data":{"id":"h_mv900o780jz5h","name":"Day28验收-已改名","freqType":"weekly","freqCount":5,"createdAt":"2026-10-15","doneDates":[]}}
+
+[6/6] GET 再读一次，应 404 not_found
+HTTP 200
+{"ok":true,"service":"habit-board-api","function":"api-habits","version":"v1.3","envId":"habit-board-d0gum6nqu512acc29","count":6,"generatedAt":"2026-10-15T03:48:15.872Z","data":[{"id":"h_seed_water","name":"每天喝 8 杯水","freqType":"daily","freqCount":7,"createdAt":"2026-08-25","doneDates":["2026-10-04","2026-10-03","2026-10-02","2026-10-01","2026-09-30","2026-09-28"]},{"id":"h_seed_walk","name":"每天走 6000 步","freqType":"daily","freqCount":7,"createdAt":"2026-08-30","doneDates":["2026-10-04","2026-10-03","2026-10-01","2026-09-29"]},{"id":"h_seed_english","name":"背 15 个单词","freqType":"daily","freqCount":7,"createdAt":"2026-09-04","doneDates":["2026-10-02"]},{"id":"h_seed_read","name":"睡前阅读 20 分钟","freqType":"daily","freqCount":7,"createdAt":"2026-09-06","doneDates":["2026-10-03","2026-09-30"]},{"id":"h_seed_gym","name":"去健身房","freqType":"weekly","freqCount":3,"createdAt":"2026-09-13","doneDates":["2026-10-04","2026-10-02","2026-09-29"]},{"id":"h_seed_diary","name":"写一段日记","freqType":"weekly","freqCount":2,"createdAt":"2026-09-20","doneDates":["2026-10-01"]}]}
+
+====================================================
+结论（初稿）: 新建→读回→列表→改名→删除→404，六步闭环
+
+----------------------------------------------------
+【更正 · 11:52】第 2 步和第 6 步的「GET /api/habits/<id>」是打错了地址——
+接口契约（api-contract.md 3.2~3.12）里**没有「GET 读单条」这条路**，
+只有 GET 列表 / POST / PATCH / DELETE 四种。契约外地址被云函数兜底成了返回整个列表（HTTP 200）。
+**删除是否生效的正确证据是**：删除前列表 count=7（含 h_mv900o780jz5h），
+删除后 count=6 且列表中**不再出现**该 id（见第 6 步返回体）。
+测试数据 h_mv900o780jz5h 已软删（deleted.mode=soft），不留垃圾。
+教训记进 day28 复盘：验收官检测自己也要先对着契约打，不能想当然造地址。

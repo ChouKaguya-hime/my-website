@@ -1,5 +1,5 @@
 {
-  "when": "2026-10-13T15:36:40.188Z",
+  "when": "2026-10-15T03:49:52.156Z",
   "project": "C:\\Users\\LM\\WorkBuddy\\2026-09-17-21-37-40\\my-website",
   "staticUrl": "https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com",
   "apiUrl": "https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com",
@@ -13,14 +13,14 @@
       "id": "A1",
       "name": "敏感文件没被 Git 跟踪（.env / *.key / *.pem / *.p12 / *.pfx）",
       "ok": true,
-      "extra": "跟踪清单 87 个文件，无敏感文件"
+      "extra": "跟踪清单 92 个文件，无敏感文件"
     },
     {
       "board": "A",
       "id": "A2",
       "name": "被跟踪的文件里没有硬编码密钥",
       "ok": true,
-      "extra": "扫描 87 个跟踪文件（比对 .env 里 1 个敏感值 + 密钥特征），干净"
+      "extra": "扫描 92 个跟踪文件（比对 .env 里 1 个敏感值 + 密钥特征），干净"
     },
     {
       "board": "B",

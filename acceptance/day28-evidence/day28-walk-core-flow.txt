@@ -1,0 +1,14 @@
+按标题没找到，改用进程 PID 匹配到 1 个窗口（pid=35336）
+候选窗口 hwnd=789950 尺寸=1860x1440
+window rect: 150 15 1860 1440
+预热 1: 工具条反差 sd=34.4 均值=231.1 极差=186.6
+预热 2: 工具条反差 sd=34.4 均值=231.1 极差=186.6
+[node] STEP gate=clicked
+STEP firstScreen={"title":"习惯养成规划板","source":"云端数据库","cards":6,"count":"0 / 6"}
+STEP addHabit=ok
+STEP toggleHabit=false -> true
+STEP clickCells7=详情弹层 hidden: true -> false  ← 有反应
+STEP openDetail=ERR:page.click: Timeout 4000ms exceeded.
+AFTER_ACTION={"url":"https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/","hash":"","badge":null,"shownStates":[],"boardState":[],"habitState":[],"cards":7,"cardNames":["每天喝 8 杯水","每天走 6000 步","背 15 个单词","睡前阅读 20 分钟","去健身房","写一段日记","Day27试用-临时习惯"],"todos":0,"habitHint":"","todoHint":"","waterDone":null,"toastText":"","toastShown":false}
+正式拍 1: 工具条反差 sd=40.9 均值=227.2 极差=219.4
+RESULT=OK saved=C:\Users\LM\WorkBuddy\2026-09-17-21-37-40\my-website\acceptance\day28-evidence\day28-walk-core-flow.png 1860x1440 反差=40.9

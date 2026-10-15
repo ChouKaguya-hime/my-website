@@ -1,0 +1,24 @@
+===================================================
+ 发布前检查 preflight-check
+ 项目：C:\Users\LM\WorkBuddy\2026-09-17-21-37-40\my-website
+ 静态站：https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com
+ 接口：https://habit-board-d0gum6nqu512acc29-1499798330.ap-shanghai.app.tcloudbase.com
+ 时间：2026-10-15T03:49:49.307Z
+===================================================
+
+— 板块 A · 密钥别泄漏 —
+[PASS] A1  敏感文件没被 Git 跟踪（.env / *.key / *.pem / *.p12 / *.pfx）  —  跟踪清单 92 个文件，无敏感文件
+[PASS] A2  被跟踪的文件里没有硬编码密钥  —  扫描 92 个跟踪文件（比对 .env 里 1 个敏感值 + 密钥特征），干净
+
+— 板块 B · 公网能打开且是最新 —
+[PASS] B1  公网首页能打开（静态站返回 200）  —  HTTP 200  https://habit-board-d0gum6nqu512acc29-1499798330.tcloudbaseapp.com/
+[PASS] B2  公网接口可达且是对的这份（/api-health）  —  HTTP 200  service=habit-board-api  envId=habit-board-d0gum6nqu512acc29（与 .env 一致）
+[PASS] B3  公网那份是最新（本地改了没重发就抓）  —  比了 7 个文件，逐个字节数一致
+
+— 板块 C · 发布配置自洽 —
+[PASS] C1  .gitignore 挡住了该挡的（.env、dist/）  —  实测 .env 与 dist/ 均被忽略（git check-ignore 通过）
+[PASS] C2  路由契约与部署配置一致（api-contract.md 路由表 ↔ cloudbaserc.json）  —  契约 3 条 [/api/health, /api/habits, /api/todos] ↔ 部署配置 3 条 [/api-health, /api/habits, /api/todos]，对得上
+
+===================================================
+ 合计 7 项：PASS 7 / FAIL 0
+===================================================
